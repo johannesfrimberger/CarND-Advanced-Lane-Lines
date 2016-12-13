@@ -2,8 +2,13 @@ Video:
   Process: False
   File: project_video.mp4
 Image:
-  Process: True
+  Process: False
   Folder: test_images
   Pattern: test
+CameraCalibration:
+  Folder: camera_cal
+  Pattern: calibration
+  UseStoredFile: True
+  StorageFile: camCalibration
 LaneFindingParameters:
   Test: 0
