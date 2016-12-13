@@ -2,6 +2,7 @@
 import os
 import glob
 from tqdm import tqdm
+import pickle
 
 # Import everything needed to process and transform images
 import cv2
@@ -14,74 +15,89 @@ from moviepy.editor import *
 
 class AdvancedLaneFinding:
     """
-
+    AdvancedLaneFinding (alf) provides methods to detect and visualize lanes from a
+    given video file or single images.
+    For pre processing it contains methods to determine the parameters for image rectification.
     """
 
     def __init__(self, settings):
         """
 
-        :param settings:
+        :param settings: Settings for lane finding
         """
-        # Initially store settings for lane finding pipeline
+        # Store settings for lane finding pipeline
         self.settings = settings
 
     def runCameraCalibration(self, settings):
         """
-
-        :param settings:
-        :return:
+        Check if camera calibration can be read from storage or should/has to be done again.
+        :param settings: Settings for camera calibration
         """
-        # Find all images in given folder
-        allImages = glob.glob(os.path.join(settings["Folder"], "{}*.jpg".format(settings["Pattern"])))
 
-        print("Start camera calibration on {} images in folder {}".format(len(allImages), settings["Folder"]))
+        runCalibration = not(settings["UseStoredFile"])
 
-        nCorners = (6, 9)
-
-        objpoints = []
-        imgpoints = []
-
-        objp = np.zeros((6*9, 3), np.float32)
-        objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
-
-        # Iterate over all images
-        for file in tqdm(allImages, unit="Image"):
-            outfile = file.split("/")
-            outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
-
-            img = mpimg.imread(file)
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-            # Find the chessboard corners
-            ret, corners = cv2.findChessboardCorners(gray, nCorners, None)
-            if ret:
-                objpoints.append(objp)
-                imgpoints.append(corners)
-
-                # Draw and display the corners
-                cv2.drawChessboardCorners(img, nCorners, corners, ret)
-                #mpimg.imsave(outfile, img)
+        if settings["UseStoredFile"]:
+            fileName = settings["StorageFile"]
+            # Check if file exists
+            if os.path.isfile(fileName):
+                print("Load camera calibration from {}".format(fileName))
+                pickle.load(open(fileName, "rb"))
             else:
-                print("Discard image {} for calibration".format(file))
-                #mpimg.imsave(outfile, img)
+                print("File {} does not exist --> Re-Run calibration algorithm".format(fileName))
+                runCalibration = True
 
-        img = mpimg.imread(allImages[0])
-        img_size = (img.shape[1], img.shape[0])
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size, None, None)
+        if runCalibration:
+            # Find all images in given folder
+            allImages = glob.glob(os.path.join(settings["Folder"], "{}*.jpg".format(settings["Pattern"])))
 
-        for file in tqdm(allImages, unit="Image"):
-            outfile = file.split("/")
-            outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
+            print("Start camera calibration on {} images in folder {}".format(len(allImages), settings["Folder"]))
 
-            img = mpimg.imread(file)
-            undist = cv2.undistort(img, mtx, dist, None, mtx)
-            mpimg.imsave(outfile, undist)
+            nCorners = (6, 9)
 
-    def findLanes(self, image, keepMemory):
+            objpoints = []
+            imgpoints = []
+
+            objp = np.zeros((6*9, 3), np.float32)
+            objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
+
+            # Iterate over all images
+            for file in tqdm(allImages, unit="Image"):
+                outfile = file.split("/")
+                outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
+
+                img = mpimg.imread(file)
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+                # Find the chessboard corners
+                ret, corners = cv2.findChessboardCorners(gray, nCorners, None)
+                if ret:
+                    objpoints.append(objp)
+                    imgpoints.append(corners)
+
+                    # Draw and display the corners
+                    cv2.drawChessboardCorners(img, nCorners, corners, ret)
+                    #mpimg.imsave(outfile, img)
+                else:
+                    print("Discard image {} for calibration".format(file))
+                    #mpimg.imsave(outfile, img)
+
+            img = mpimg.imread(allImages[0])
+            img_size = (img.shape[1], img.shape[0])
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size, None, None)
+
+            for file in tqdm(allImages, unit="Image"):
+                outfile = file.split("/")
+                outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
+
+                img = mpimg.imread(file)
+                undist = cv2.undistort(img, mtx, dist, None, mtx)
+                mpimg.imsave(outfile, undist)
+
+    def findLanes(self, image, keep_memory):
         """
 
         :param image:
-        :param keepMemory:
+        :param keep_memory:
         :return:
         """
         return image

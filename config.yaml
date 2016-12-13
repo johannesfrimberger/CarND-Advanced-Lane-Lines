@@ -9,6 +9,6 @@ CameraCalibration:
   Folder: camera_cal
   Pattern: calibration
   UseStoredFile: True
-  StorageFile: camCalibration
+  StorageFile: camCalibration.p
 LaneFindingParameters:
   Test: 0
