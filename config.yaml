@@ -1,0 +1,9 @@
+Video:
+  Process: False
+  File: project_video.mp4
+Image:
+  Process: True
+  Folder: test_images
+  Pattern: test
+LaneFindingParameters:
+  Test: 0
