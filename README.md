@@ -1,6 +1,6 @@
 ## Advanced Lane Finding
 
-<img src="test_images/processed/test1.jpg" width="480" alt="Combined Image" />
+<img src="processedImage.jpg" width="480" alt="Combined Image" />
 
 The
 
