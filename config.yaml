@@ -10,5 +10,6 @@ CameraCalibration:
   Pattern: calibration
   UseStoredFile: True
   StorageFile: camCalibration.p
+  ChessboardDimension: (9,6)
 LaneFindingParameters:
   Test: 0

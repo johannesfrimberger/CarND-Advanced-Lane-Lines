@@ -28,6 +28,11 @@ class AdvancedLaneFinding:
         # Store settings for lane finding pipeline
         self.settings = settings
 
+        # Camera calibration data
+        self.calibration_available = False
+        self.calibration_matrix = 0
+        self.calibration_distortion = 0
+
     def runCameraCalibration(self, settings):
         """
         Check if camera calibration can be read from storage or should/has to be done again.
@@ -35,63 +40,68 @@ class AdvancedLaneFinding:
         """
 
         runCalibration = not(settings["UseStoredFile"])
-
         if settings["UseStoredFile"]:
             fileName = settings["StorageFile"]
             # Check if file exists
             if os.path.isfile(fileName):
                 print("Load camera calibration from {}".format(fileName))
-                pickle.load(open(fileName, "rb"))
+                calibrationData = pickle.load(open(fileName, "rb"))
+                self.calibration_available = True
+                self.calibration_matrix = calibrationData["mtx"]
+                self.calibration_distortion = calibrationData["dist"]
             else:
                 print("File {} does not exist --> Re-Run calibration algorithm".format(fileName))
                 runCalibration = True
 
         if runCalibration:
+
             # Find all images in given folder
-            allImages = glob.glob(os.path.join(settings["Folder"], "{}*.jpg".format(settings["Pattern"])))
+            allImages = glob.glob(os.path.join(settings["Folder"], "{}*".format(settings["Pattern"])))
 
             print("Start camera calibration on {} images in folder {}".format(len(allImages), settings["Folder"]))
 
-            nCorners = (6, 9)
+            dim = eval(settings["ChessboardDimension"])
 
-            objpoints = []
-            imgpoints = []
+            # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+            objp = np.zeros((dim[1] * dim[0], 3), np.float32)
+            objp[:, :2] = np.mgrid[0:dim[0], 0:dim[1]].T.reshape(-1, 2)
 
-            objp = np.zeros((6*9, 3), np.float32)
-            objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
+            # Arrays to store object points and image points from all the images.
+            objpoints = []  # 3d points in real world space
+            imgpoints = []  # 2d points in image plane.
 
-            # Iterate over all images
-            for file in tqdm(allImages, unit="Image"):
-                outfile = file.split("/")
-                outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
-
-                img = mpimg.imread(file)
+            # Step through the list and search for chessboard corners
+            for filename in allImages:
+                img = cv2.imread(filename)
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
                 # Find the chessboard corners
-                ret, corners = cv2.findChessboardCorners(gray, nCorners, None)
-                if ret:
+                ret, corners = cv2.findChessboardCorners(gray, dim, None)
+
+                # If found, add object points, image points
+                if ret == True:
                     objpoints.append(objp)
                     imgpoints.append(corners)
-
-                    # Draw and display the corners
-                    cv2.drawChessboardCorners(img, nCorners, corners, ret)
-                    #mpimg.imsave(outfile, img)
                 else:
-                    print("Discard image {} for calibration".format(file))
-                    #mpimg.imsave(outfile, img)
+                    print("Discard {} for camera calibration".format(filename))
 
-            img = mpimg.imread(allImages[0])
+            # Test undistortion on an image
+            img = cv2.imread(allImages[0])
             img_size = (img.shape[1], img.shape[0])
+
+            # Do camera calibration given object points and image points
             ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size, None, None)
 
-            for file in tqdm(allImages, unit="Image"):
-                outfile = file.split("/")
-                outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
+            # Save the camera calibration result for later use
+            dist_pickle = {}
+            dist_pickle["mtx"] = mtx
+            dist_pickle["dist"] = dist
+            pickle.dump(dist_pickle, open(settings["StorageFile"], "wb"))
 
-                img = mpimg.imread(file)
-                undist = cv2.undistort(img, mtx, dist, None, mtx)
-                mpimg.imsave(outfile, undist)
+            # Update internal storage of calibration data
+            self.calibration_available = True
+            self.calibration_matrix = mtx
+            self.calibration_distortion = dist
 
     def findLanes(self, image, keep_memory):
         """
