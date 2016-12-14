@@ -103,6 +103,38 @@ class AdvancedLaneFinding:
             self.calibration_matrix = mtx
             self.calibration_distortion = dist
 
+
+    def create_binary_image(self, input):
+        """
+        Apply threhshold on HLS s channel and sobel x direction
+        :param input: Image that should be thresholded
+        :return: binary_image
+        """
+        # Pre process image data (e.g. convert to color spaces)
+        gray = cv2.cvtColor(input, cv2.COLOR_BGR2GRAY)
+        hls = cv2.cvtColor(input, cv2.COLOR_BGR2HLS)
+        s_channel = hls[:, :, 2]
+
+        # Threshold on s channel
+        s_binary = np.zeros_like(s_channel)
+        s_binary[(s_channel >= self.settings["HlsThreshLo"]) & (s_channel <= self.settings["HlsThreshHi"])] = 1
+
+        # Sobel x
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)  # Take the derivative in x
+        abs_sobelx = np.absolute(sobelx)  # Absolute x derivative to accentuate lines away from horizontal
+        scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
+
+        # Threshold x gradient
+        thresh_min = self.settings["SobelXThreshLo"]
+        thresh_max = self.settings["SobelXThreshHi"]
+        sxbinary = np.zeros_like(scaled_sobel)
+        sxbinary[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
+
+        combined_binary = np.zeros_like(sxbinary)
+        combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
+
+        return combined_binary
+
     def findLanes(self, image, keep_memory):
         """
 
@@ -110,7 +142,26 @@ class AdvancedLaneFinding:
         :param keep_memory:
         :return:
         """
-        return image
+
+        # 1. Apply the distortion correction to the raw image
+        if self.calibration_available:
+            undist = cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
+        else:
+            print("Camera calibration is not available")
+            return image
+
+        # 2. Use color transforms, gradients, etc., to create a thresholded binary image.
+        binary = self.create_binary_image(undist)
+
+        # 3. Apply a perspective transform to rectify binary image ("birds-eye view")
+
+        # 4. Detect lane pixels and fit to find lane boundary
+
+        # 5. Determine curvature of the lane and vehicle position with respect to center
+
+        # 6. Warp the detected lane boundaries back onto the original image
+
+        return undist
 
     def findLanesImage(self, image):
         """
