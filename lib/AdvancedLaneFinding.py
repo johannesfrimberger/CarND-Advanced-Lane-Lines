@@ -405,17 +405,18 @@ class AdvancedLaneFinding:
         :return:
         """
 
-        file_name = settings["InputFile"]
+        file_names = settings["InputFile"]
         storage_folder = settings["StorageFolder"]
 
-        output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        for file_name in file_names:
+            output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-        print("Start processing video {} and save it as {}".format(file_name, output_file))
+            print("Start processing video {} and save it as {}".format(file_name, output_file))
 
-        input = VideoFileClip(file_name)
-        output = input.fl_image(self.findLanesVideo)
-        output.write_videofile(output_file, audio=False)
+            input = VideoFileClip(file_name)
+            output = input.fl_image(self.findLanesVideo)
+            output.write_videofile(output_file, audio=False)
 
         return 0
 

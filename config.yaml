@@ -1,9 +1,10 @@
 Video:
-  Process: False
-  InputFile: data/videos/short_project_video.mp4
+  Process: True
+  InputFile:
+    - data/videos/short_project_video.mp4
   StorageFolder: results/videos
 Image:
-  Process: True
+  Process: False
   InputFolder: data/images
   Pattern: test
   StorageFolder: results/images
