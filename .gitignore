@@ -1,8 +1,6 @@
 # Created by .ignore support plugin (hsz.mobi)
 __pycache__
-camera_cal
-test_images
-*.jpg
-*.mp4
-camCalibration.p
 .idea
+#results/camera_cal/*
+#results/images/*
+#results/videos/*
