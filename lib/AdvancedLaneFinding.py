@@ -17,6 +17,7 @@ from moviepy.editor import *
 from lib.Line import Line
 from lib.Utils import region_of_interest, transform_to_bev
 
+
 class AdvancedLaneFinding:
     """
     AdvancedLaneFinding (alf) provides methods to detect and visualize lanes from a
@@ -60,60 +61,98 @@ class AdvancedLaneFinding:
         Check if camera calibration can be read from storage or should/has to be done again.
         :param settings: Settings for camera calibration
         """
+        # Set filename to store camera calibration information
+        storage_file = os.path.join(settings["StorageFolder"], "camCalibration.p")
 
+        # Check if intermediate resulsts should be stored
+        store_results = settings["StoreIntermediateResults"]
+
+        # Check if calibration should be determined or stored calibration should be used
         run_calibration = not(settings["UseStoredFile"])
 
-        if settings["UseStoredFile"]:
-            file_name = settings["StorageFile"]
+        if not run_calibration:
 
             # Check if file exists
-            if os.path.isfile(file_name):
-                print("Load camera calibration from {}".format(file_name))
-                calibrationData = pickle.load(open(file_name, "rb"))
+            if os.path.isfile(storage_file):
+                print("Load camera calibration from {}".format(storage_file))
+                calibration_data = pickle.load(open(storage_file, "rb"))
+
+                # Update internal storage
                 self.calibration_available = True
-                self.calibration_matrix = calibrationData["mtx"]
-                self.calibration_distortion = calibrationData["dist"]
+                self.calibration_matrix = calibration_data["mtx"]
+                self.calibration_distortion = calibration_data["dist"]
             else:
-                print("File {} does not exist --> Re-Run calibration algorithm".format(file_name))
+                print("File {} does not exist --> Re-Run calibration algorithm".format(storage_file))
                 run_calibration = True
 
+        # If requested, run calibration and store the results
         if run_calibration:
 
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
             # Find all images in given folder
-            allImages = glob.glob(os.path.join(settings["Folder"], "{}*".format(settings["Pattern"])))
-            print("Start camera calibration on {} images in folder {}".format(len(allImages), settings["Folder"]))
+            all_images = glob.glob(os.path.join(settings["Folder"], "{}*".format(settings["Pattern"])))
+            print("Start camera calibration on {} images in folder {}".format(len(all_images), settings["Folder"]))
 
-            dim = eval(settings["ChessboardDimension"])
-
-            # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-            objp = np.zeros((dim[1] * dim[0], 3), np.float32)
-            objp[:, :2] = np.mgrid[0:dim[0], 0:dim[1]].T.reshape(-1, 2)
+            # Read all chessboard dimensions
+            dims = eval(settings["ChessboardDimension"])
 
             # Arrays to store object points and image points from all the images.
-            objpoints = []  # 3d points in real world space
-            imgpoints = []  # 2d points in image plane.
+            obj_points = []  # 3d points in real world space
+            img_points = []  # 2d points in image plane.
 
             # Step through the list and search for chessboard corners
-            for filename in allImages:
-                img = cv2.imread(filename)
+            for file_name in all_images:
+                img = cv2.imread(file_name)
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
                 # Find the chessboard corners
-                ret, corners = cv2.findChessboardCorners(gray, dim, None)
+                ret = False
+
+                # Iterate of all possible dimension
+                for d in dims:
+                    # Try this dimensions
+                    ret, corners = cv2.findChessboardCorners(gray, d, None)
+
+                    # If corners where found add them to list and break loop
+                    if ret:
+
+                        # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+                        objp = np.zeros((d[1] * d[0], 3), np.float32)
+                        objp[:, :2] = np.mgrid[0:d[0], 0:d[1]].T.reshape(-1, 2)
+                        obj_points.append(objp)
+
+                        # Improve accuracy
+                        cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+                        img_points.append(corners)
+
+                        if store_results:
+                            img = cv2.drawChessboardCorners(img, d, corners, ret)
+                            output_file = os.path.join(settings["StorageFolder"], "chess_" + os.path.basename(file_name))
+                            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                            cv2.imwrite(output_file, img)
+
+                        break
 
                 # If found, add object points, image points
-                if ret == True:
-                    objpoints.append(objp)
-                    imgpoints.append(corners)
-                else:
-                    print("Discard {} for camera calibration".format(filename))
+                if not ret:
+                    print("Discard {} for camera calibration".format(file_name))
 
             # Test undistortion on an image
-            img = cv2.imread(allImages[0])
+            img = cv2.imread(all_images[0])
             img_size = (img.shape[1], img.shape[0])
 
             # Do camera calibration given object points and image points
-            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size, None, None)
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, img_size, None, None)
+
+            # Store undistored images if requested
+            if store_results:
+                for file_name in all_images:
+                    img = cv2.imread(file_name)
+                    undist = cv2.undistort(img, mtx, dist, None, mtx)
+                    output_file = os.path.join(settings["StorageFolder"], "undist_" + os.path.basename(file_name))
+                    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                    cv2.imwrite(output_file, undist)
 
             # Save the camera calibration result for later use
             dist_pickle = {}
@@ -121,7 +160,7 @@ class AdvancedLaneFinding:
             dist_pickle["dist"] = dist
 
             # Check if folder exists and create it if necessary
-            storage_file = settings["StorageFile"]
+
             os.makedirs(os.path.dirname(storage_file), exist_ok=True)
             pickle.dump(dist_pickle, open(storage_file, "wb"))
 

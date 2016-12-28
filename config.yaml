@@ -1,16 +1,20 @@
 Video:
   Process: False
-  File: test.mp4
+  File: data/videos/short_project_video.mp4
+  StorageFolder: results/videos
 Image:
   Process: False
-  Folder: test_images
+  Folder: data/images
   Pattern: test
+  StorageFolder: results/images
+  StoreIntermediateResults: True
 CameraCalibration:
   Folder: data/camera_cal
   Pattern: calibration
-  UseStoredFile: False
-  StorageFile: results/camera_cal/camCalibration.p
-  ChessboardDimension: (9,6)
+  UseStoredFile: True
+  StorageFolder: results/camera_cal
+  ChessboardDimension: (9,6), (9,5), (7,6), (7,4)
+  StoreIntermediateResults: True
 LaneFindingParameters:
   HlsThreshLo: 120
   HlsThreshHi: 255
