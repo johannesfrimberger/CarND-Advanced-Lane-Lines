@@ -13,6 +13,10 @@ import numpy as np
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import *
 
+# Import local files
+from Line import Line
+from Utils import region_of_interest, transform_to_bev
+
 class AdvancedLaneFinding:
     """
     AdvancedLaneFinding (alf) provides methods to detect and visualize lanes from a
@@ -32,6 +36,24 @@ class AdvancedLaneFinding:
         self.calibration_available = False
         self.calibration_matrix = 0
         self.calibration_distortion = 0
+
+        # Line objects for left and right lanes
+        self.left_lane = Line()
+        self.right_lane = Line()
+
+        # Parameters for masking the image
+        self.mask_outer = [(0, 0), (0, 0), (0, 0), (0, 0)]
+        self.mask_inner = [(0, 0), (0, 0), (0, 0), (0, 0)]
+
+        # Set all parameters to default values
+        self.reset_pameters()
+
+    def reset_pameters(self):
+        """
+
+        """
+        self.mask_outer = [(100, 660), (500, 480), (800, 480), (1130, 660)]
+        self.mask_inner = [(370, 660), (530, 550), (780, 550), (990, 660)]
 
     def runCameraCalibration(self, settings):
         """
@@ -103,16 +125,42 @@ class AdvancedLaneFinding:
             self.calibration_matrix = mtx
             self.calibration_distortion = dist
 
+    def apply_mask(self, image, mask, extend = False, inverse = False):
+        """
+        Apply internally stored mask to image
+        :param image:
+        :param mask:
+        :param extend:
+        :return:
+        """
+        mask_bl = mask[0]
+        mask_tl = mask[1]
+        mask_tr = mask[2]
+        mask_br = mask[3]
 
-    def create_binary_image(self, input):
+        if extend:
+            # TODO: Check that boundaries are not exceeded
+            mask_bl = (mask_bl[0] - 50, mask_bl[1] + 50)
+            mask_tl = (mask_tl[0] - 50, mask_tl[1] - 50)
+            mask_tr = (mask_tr[0] + 50, mask_tr[1] - 50)
+            mask_br = (mask_br[0] + 50, mask_br[1] + 50)
+
+        vertices = np.array([[mask_bl, mask_tl, mask_tr, mask_br]],
+                        dtype=np.int32)
+
+        return region_of_interest(image, vertices, inverse)
+
+    def create_binary_image(self, image):
         """
         Apply threhshold on HLS s channel and sobel x direction
-        :param input: Image that should be thresholded
+        :param image: Image that should be thresholded
         :return: binary_image
         """
         # Pre process image data (e.g. convert to color spaces)
-        gray = cv2.cvtColor(input, cv2.COLOR_BGR2GRAY)
-        hls = cv2.cvtColor(input, cv2.COLOR_BGR2HLS)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+
+        hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
         s_channel = hls[:, :, 2]
 
         # Threshold on s channel
@@ -133,13 +181,85 @@ class AdvancedLaneFinding:
         combined_binary = np.zeros_like(sxbinary)
         combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
 
+        #color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
+
         return combined_binary
+
+    def fit_lane(self, image, Minv):
+        slice = 100
+        windows = 100
+        center = 0
+
+        colorBev = np.dstack((image, image, image)) * 255
+
+        leftLane = np.copy(image)
+        rightLane = np.copy(image)
+
+        xCoordLeft = []
+        xCoordRight = []
+        yCoordLeft = []
+        yCoordRight = []
+
+        # print(colorBev.shape)
+        for n in reversed(range(7)):
+            imageSlice = image[(center + (n * slice)):(center + ((n + 1) * slice)), :]
+            histogram = np.sum(imageSlice, axis=0)
+            indLeft = histogram[0:(len(histogram) / 2)].argmax()
+            indRight = histogram[(len(histogram) / 2):].argmax() + int(len(histogram) / 2)
+
+            xCoord = float(center) + ((2*float(n)) + 1) * slice / 2.
+
+            if indLeft > 0:
+                xCoordLeft.append(xCoord)
+                yCoordLeft.append(float(indLeft))
+
+            if indRight > 0:
+                xCoordRight.append(xCoord)
+                yCoordRight.append(float(indRight))
+
+            #colorBev[(center + (n * slice)):(center + ((n + 1) * slice)), indLeft - windows:indLeft + windows, 0:2] = 0
+            #colorBev[(center + (n * slice)):(center + ((n + 1) * slice)), indRight - windows:indRight + windows, 1:3] = 0
+
+        left_fit = np.polyfit(xCoordLeft, yCoordLeft, 2)
+        right_fit = np.polyfit(xCoordRight, yCoordRight, 2)
+        yvals = np.linspace(0, 100, num=101) * 7.2
+        left_fitx = left_fit[0] * yvals ** 2 + left_fit[1] * yvals + left_fit[2]
+        right_fitx = right_fit[0] * yvals ** 2 + right_fit[1] * yvals + right_fit[2]
+
+        # Plot up the fake data
+        #plt.plot(leftx, yvals, 'o', color='red')
+        #plt.plot(rightx, yvals, 'o', color='blue')
+        plt.xlim(0, 1280)
+        plt.ylim(0, 720)
+        plt.plot(left_fitx, yvals, color='green', linewidth=3)
+        plt.plot(right_fitx, yvals, color='red', linewidth=3)
+        #plt.plot(right_fitx, yvals, color='green', linewidth=3)
+        plt.gca().invert_yaxis()  # to visualize as we do the images
+        #plt.show()
+
+        # Create an image to draw the lines on
+        warp_zero = np.zeros_like(image).astype(np.uint8)
+        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        pts_left = np.array([np.transpose(np.vstack([left_fitx, yvals]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, yvals])))])
+        pts = np.hstack((pts_left, pts_right))
+
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+
+        cv2.imshow("Test", newwarp)
+        cv2.waitKey()
 
     def findLanes(self, image, keep_memory):
         """
 
-        :param image:
-        :param keep_memory:
+        :param image: Image that should be processed
+        :param keep_memory: Use information from previous frames to improve tracking accuracy
         :return:
         """
 
@@ -151,25 +271,34 @@ class AdvancedLaneFinding:
             return image
 
         # 2. Use color transforms, gradients, etc., to create a thresholded binary image.
+        undist = self.apply_mask(undist, self.mask_outer, extend=True)
         binary = self.create_binary_image(undist)
+        binary = self.apply_mask(binary, self.mask_outer)
+        binary = self.apply_mask(binary, self.mask_inner, inverse=True)
 
         # 3. Apply a perspective transform to rectify binary image ("birds-eye view")
+        bev, MInv = transform_to_bev(binary)
 
         # 4. Detect lane pixels and fit to find lane boundary
+        lane = self.fit_lane(bev, MInv)
 
         # 5. Determine curvature of the lane and vehicle position with respect to center
 
         # 6. Warp the detected lane boundaries back onto the original image
 
-        return undist
+        #return binary
+        return bev
 
-    def findLanesImage(self, image):
+    def findLanesImage(self, image, keep_memory=False):
         """
 
         :param image:
+        :param keep_memory:
         :return:
         """
-        return self.findLanes(image, False)
+        #return self.findLanes(image, keep_memory)
+
+        return image
 
     def findLanesVideo(self, image):
         """

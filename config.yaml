@@ -1,8 +1,8 @@
 Video:
-  Process: True
-  File: project_video.mp4
-Image:
   Process: False
+  File: test.mp4
+Image:
+  Process: True
   Folder: test_images
   Pattern: test
 CameraCalibration:
@@ -12,7 +12,7 @@ CameraCalibration:
   StorageFile: camCalibration.p
   ChessboardDimension: (9,6)
 LaneFindingParameters:
-  HlsThreshLo: 90
+  HlsThreshLo: 120
   HlsThreshHi: 255
-  SobelXThreshLo: 20
+  SobelXThreshLo: 50
   SobelXThreshHi: 100

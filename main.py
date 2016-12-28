@@ -24,7 +24,7 @@ def main():
     if settings["Video"]["Process"]:
         alf.processVideo(settings["Video"]["File"])
 
-    # Check if image folder should be processed
+    # Check if all images in a folder should be processed
     if settings["Image"]["Process"]:
         alf.processImageFolder(settings["Image"]["Folder"], settings["Image"]["Pattern"])
 
