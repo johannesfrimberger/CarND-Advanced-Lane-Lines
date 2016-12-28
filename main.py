@@ -1,9 +1,12 @@
 import yaml
 import argparse
 
-from AdvancedLaneFinding import AdvancedLaneFinding
+from lib.AdvancedLaneFinding import AdvancedLaneFinding
 
 def main():
+    """
+    Read settings file and run AdvancedLaneFinding class with this settings
+    """
 
     # Set parser for inputs
     parser = argparse.ArgumentParser(description="Processing input arguments")
@@ -18,7 +21,7 @@ def main():
     alf = AdvancedLaneFinding(settings["LaneFindingParameters"])
 
     # Run camera calibration
-    alf.runCameraCalibration(settings["CameraCalibration"])
+    alf.run_camera_calibration(settings["CameraCalibration"])
 
     # Check if video should be processed
     if settings["Video"]["Process"]:
