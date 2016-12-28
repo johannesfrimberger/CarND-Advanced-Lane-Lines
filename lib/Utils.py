@@ -36,20 +36,24 @@ def region_of_interest(img, vertices, inverse = False):
     return masked_image
 
 
-def transform_to_bev(image):
+def transform_to_bev(image, src, offset=(0, 0)):
     """
     Transform input image to birds eye view
     :param image: grayscale image
+    :param src: grayscale image
+    :param offset: grayscale image
     :return: image in birds eye view
     """
     img_size = (image.shape[1], image.shape[0])
-    src = np.float32([[600, 440], [800, 440], [1130, 650], [250, 660]])
-    offset = 100
 
-    dst = np.float32([[offset, offset], [img_size[0] - offset, offset],
-                      [img_size[0] - offset, img_size[1] - offset],
-                      [offset, img_size[1] - offset]])
+    dst = np.float32([
+        [offset[0], img_size[1] - offset[1]],
+        [offset[0], offset[1]],
+        [img_size[0] - offset[0], offset[1]],
+        [img_size[0] - offset[0], img_size[1] - offset[1]]
+    ])
+
     M = cv2.getPerspectiveTransform(src, dst)
-    MInv = cv2.getPerspectiveTransform(src, dst)
+    MInv = cv2.getPerspectiveTransform(dst, src)
 
-    return [cv2.warpPerspective(image, M, img_size), MInv]
+    return cv2.warpPerspective(image, M, img_size), MInv

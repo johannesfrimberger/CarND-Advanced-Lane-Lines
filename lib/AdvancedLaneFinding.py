@@ -9,6 +9,8 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
+import peakutils as pu
+from scipy import signal
 
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import *
@@ -55,6 +57,22 @@ class AdvancedLaneFinding:
         """
         self.mask_outer = [(100, 660), (500, 480), (800, 480), (1130, 660)]
         self.mask_inner = [(370, 660), (530, 550), (780, 550), (990, 660)]
+
+    @staticmethod
+    def save_storage(store_results, storage_folder, file_name, identifier, image):
+        """
+
+        :param store_results:
+        :param storage_folder:
+        :param file_name:
+        :param identifier:
+        :param image:
+        :return:
+        """
+        if store_results:
+            output_file = os.path.join(storage_folder, identifier + os.path.basename(file_name))
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            mpimg.imsave(output_file, image)
 
     def run_camera_calibration(self, settings):
         """
@@ -229,60 +247,83 @@ class AdvancedLaneFinding:
 
         return combined_binary
 
-    def fit_lane(self, image, Minv):
-        slice = 100
-        windows = 100
-        center = 0
+    def fit_lane(self, image):
+        """
 
-        colorBev = np.dstack((image, image, image)) * 255
+        :param image:
+        :return:
+        """
+        img_shape = (image.shape[0], image.shape[1])
 
-        leftLane = np.copy(image)
-        rightLane = np.copy(image)
+        histogram = np.sum(image[image.shape[0] / 2:, :], axis=0)
 
-        xCoordLeft = []
-        xCoordRight = []
-        yCoordLeft = []
-        yCoordRight = []
+        left_image = image[:, 0:(image.shape[1]/2)]
+        right_image = image[:, (image.shape[1] / 2):]
 
-        # print(colorBev.shape)
-        for n in reversed(range(7)):
-            imageSlice = image[(center + (n * slice)):(center + ((n + 1) * slice)), :]
-            histogram = np.sum(imageSlice, axis=0)
-            indLeft = histogram[0:(len(histogram) / 2)].argmax()
-            indRight = histogram[(len(histogram) / 2):].argmax() + int(len(histogram) / 2)
+        left_histogram = np.sum(left_image[left_image.shape[0] / 2:, :], axis=0)
+        start_ind_left = np.argmax(left_histogram)
 
-            xCoord = float(center) + ((2*float(n)) + 1) * slice / 2.
+        right_histogram = np.sum(right_image[right_image.shape[0] / 2:, :], axis=0)
+        start_ind_right = np.argmax(right_histogram) + (image.shape[1] / 2)
 
-            if indLeft > 0:
-                xCoordLeft.append(xCoord)
-                yCoordLeft.append(float(indLeft))
+        search_window = 200 / 2
 
-            if indRight > 0:
-                xCoordRight.append(xCoord)
-                yCoordRight.append(float(indRight))
+        and_image = np.zeros_like(image)
+        and_image[:, (start_ind_left-search_window):(start_ind_left+search_window)] = 1
+        and_image[:, (start_ind_right - search_window):(start_ind_right + search_window)] = 1
 
-            #colorBev[(center + (n * slice)):(center + ((n + 1) * slice)), indLeft - windows:indLeft + windows, 0:2] = 0
-            #colorBev[(center + (n * slice)):(center + ((n + 1) * slice)), indRight - windows:indRight + windows, 1:3] = 0
+        slices = 90
 
-        left_fit = np.polyfit(xCoordLeft, yCoordLeft, 2)
-        right_fit = np.polyfit(xCoordRight, yCoordRight, 2)
+        ind_left = np.zeros(shape=(0, 2))
+        ind_right = np.zeros(shape=(0, 2))
+
+        for bottom in range(image.shape[0], 0, -slices):
+            image_slice = image[(bottom-slices):bottom, :]
+
+            l = np.array(np.where(
+                image_slice[:, (start_ind_left - search_window):(start_ind_left + search_window)] > 0)).transpose()
+            r = np.array(np.where(
+                image_slice[:, (start_ind_right - search_window):(start_ind_right + search_window)] > 0)).transpose()
+
+            l = l + ((bottom-slices), (start_ind_left - search_window))
+            r = r + ((bottom - slices), (start_ind_right - search_window))
+
+            if l.shape[0] > 0:
+                ind_left = np.concatenate((ind_left, l), axis=0)
+            if r.shape[0] > 0:
+                ind_right = np.concatenate((ind_right, r), axis=0)
+
+        return ind_left, ind_right
+
+    def calc_curvature(self, lane_pixels):
+        """
+
+        :param lane_pixels:
+        :return:
+        """
+
+        ind_left, ind_right = lane_pixels
+
+        left_fit = np.polyfit(ind_left[:, 0], ind_left[:, 1], 2)
+        right_fit = np.polyfit(ind_right[:, 0], ind_right[:, 1], 2)
+
+        return left_fit, right_fit
+
+    def draw_lanes(self, left_crv, right_crv, color_image, bev, MInv):
+        """
+
+        :param left_crv:
+        :param right_crv:
+        :param bev:
+        :return:
+        """
+
         yvals = np.linspace(0, 100, num=101) * 7.2
-        left_fitx = left_fit[0] * yvals ** 2 + left_fit[1] * yvals + left_fit[2]
-        right_fitx = right_fit[0] * yvals ** 2 + right_fit[1] * yvals + right_fit[2]
-
-        # Plot up the fake data
-        #plt.plot(leftx, yvals, 'o', color='red')
-        #plt.plot(rightx, yvals, 'o', color='blue')
-        plt.xlim(0, 1280)
-        plt.ylim(0, 720)
-        plt.plot(left_fitx, yvals, color='green', linewidth=3)
-        plt.plot(right_fitx, yvals, color='red', linewidth=3)
-        #plt.plot(right_fitx, yvals, color='green', linewidth=3)
-        plt.gca().invert_yaxis()  # to visualize as we do the images
-        #plt.show()
+        left_fitx = left_crv[0] * yvals ** 2 + left_crv[1] * yvals + left_crv[2]
+        right_fitx = right_crv[0] * yvals ** 2 + right_crv[1] * yvals + right_crv[2]
 
         # Create an image to draw the lines on
-        warp_zero = np.zeros_like(image).astype(np.uint8)
+        warp_zero = np.zeros_like(bev).astype(np.uint8)
         color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
         # Recast the x and y points into usable format for cv2.fillPoly()
@@ -294,12 +335,14 @@ class AdvancedLaneFinding:
         cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+        newwarp = cv2.warpPerspective(color_warp, MInv, (color_image.shape[1], color_image.shape[0]))
 
-        cv2.imshow("Test", newwarp)
-        cv2.waitKey()
+        # Combine the result with the original image
+        result = cv2.addWeighted(color_image, 1, newwarp, 0.3, 0)
 
-    def findLanes(self, image, keep_memory):
+        return result
+
+    def findLanes(self, image, keep_memory, store_results=False, storage_folder="", file_name=""):
         """
 
         :param image: Image that should be processed
@@ -310,39 +353,42 @@ class AdvancedLaneFinding:
         # 1. Apply the distortion correction to the raw image
         if self.calibration_available:
             undist = cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
+            self.save_storage(store_results, storage_folder, file_name, "step1_", image)
         else:
             print("Camera calibration is not available")
             return image
 
         # 2. Use color transforms, gradients, etc., to create a thresholded binary image.
-        undist = self.apply_mask(undist, self.mask_outer, extend=True)
-        binary = self.create_binary_image(undist)
+        masked = self.apply_mask(undist, self.mask_outer, extend=True)
+        binary = self.create_binary_image(masked)
         binary = self.apply_mask(binary, self.mask_outer)
         binary = self.apply_mask(binary, self.mask_inner, inverse=True)
+        self.save_storage(store_results, storage_folder, file_name, "step2_", binary)
 
         # 3. Apply a perspective transform to rectify binary image ("birds-eye view")
-        bev, MInv = transform_to_bev(binary)
+        src = np.float32([[190, 720], [583, 460], [705, 460], [1150, 720]])
+        bev, MInv = transform_to_bev(binary, src, offset=(300, 0))
+        self.save_storage(store_results, storage_folder, file_name, "step3_", bev)
 
         # 4. Detect lane pixels and fit to find lane boundary
-        lane = self.fit_lane(bev, MInv)
+        lane_pixels = self.fit_lane(bev)
 
         # 5. Determine curvature of the lane and vehicle position with respect to center
+        left_crv, right_crv = self.calc_curvature(lane_pixels)
 
         # 6. Warp the detected lane boundaries back onto the original image
+        warped_image = self.draw_lanes(left_crv, right_crv, image, bev, MInv)
 
-        #return binary
-        return bev
+        return warped_image
 
-    def findLanesImage(self, image, keep_memory=False):
+    def findLanesImage(self, image, keep_memory=False, store_results=False, storage_folder="", file_name=""):
         """
 
         :param image:
         :param keep_memory:
         :return:
         """
-        #return self.findLanes(image, keep_memory)
-
-        return image
+        return self.findLanes(image, keep_memory, store_results, storage_folder, file_name)
 
     def findLanesVideo(self, image):
         """
@@ -352,38 +398,50 @@ class AdvancedLaneFinding:
         """
         return self.findLanes(image, True)
 
-    def processVideo(self, file):
+    def processVideo(self, settings):
         """
 
-        :param file:
+        :param settings:
         :return:
         """
-        output_file = file.split(".")
-        output_file = output_file[0] + "_Processed." + output_file[1]
 
-        print("Start processing video {} and save it as {}".format(file, output_file))
+        file_name = settings["InputFile"]
+        storage_folder = settings["StorageFolder"]
 
-        input = VideoFileClip(file)
+        output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+        print("Start processing video {} and save it as {}".format(file_name, output_file))
+
+        input = VideoFileClip(file_name)
         output = input.fl_image(self.findLanesVideo)
         output.write_videofile(output_file, audio=False)
 
         return 0
 
-    def processImageFolder(self, folder, pattern):
+    def processImageFolder(self, settings):
         """
 
-        :param folder:
-        :param pattern:
+        :param settings:
         :return:
         """
-        # Find all images in given folder
-        allImages = glob.glob(os.path.join(folder, "{}*.jpg".format(pattern)))
 
-        print("Start processing images {} in folder {} with pattern {}".format(len(allImages), folder, pattern))
+        # Read settings
+        input_folder = settings["InputFolder"]
+        storage_folder = settings["StorageFolder"]
+        pattern = settings["Pattern"]
+        store_results = settings["StoreIntermediateResults"]
+
+        # Find all images in given folder
+        allImages = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
+
+        print("Start processing images {} in folder {} with pattern {}".format(len(allImages), input_folder, pattern))
 
         # Iterate over all images
-        for file in tqdm(allImages, unit="Image"):
-            outfile = file.split("/")
-            outfile = os.path.join(os.path.join(outfile[0], "processed"), outfile[1])
-            mpimg.imsave(outfile, self.findLanesImage(mpimg.imread(file)))
+        for file_name in tqdm(allImages, unit="Image"):
+            output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            mpimg.imsave(output_file, self.findLanesImage(mpimg.imread(file_name), False, store_results,
+                                                          storage_folder, file_name))
+
         return 0

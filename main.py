@@ -25,11 +25,11 @@ def main():
 
     # Check if video should be processed
     if settings["Video"]["Process"]:
-        alf.processVideo(settings["Video"]["File"])
+        alf.processVideo(settings["Video"])
 
     # Check if all images in a folder should be processed
     if settings["Image"]["Process"]:
-        alf.processImageFolder(settings["Image"]["Folder"], settings["Image"]["Pattern"])
+        alf.processImageFolder(settings["Image"])
 
 if __name__ == "__main__":
     main()
