@@ -9,13 +9,6 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
-import peakutils as pu
-from scipy import signal
-
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import (
-    LinearRegression, TheilSenRegressor, RANSACRegressor, HuberRegressor)
-from sklearn.pipeline import make_pipeline
 
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import *
