@@ -8,6 +8,8 @@ class Line():
         """
 
         """
+        #
+        self.n_samples = 5
 
         # was the line detected in the last iteration?
         self.detected = False
@@ -26,6 +28,28 @@ class Line():
         # difference in fit coefficients between last and new fits
         self.diffs = np.array([0,0,0], dtype='float')
         # x values for detected line pixels
-        self.allx = None
+        self.allx = []
         # y values for detected line pixels
-        self.ally = None
+        self.ally = []
+
+    def update(self, x, y):
+        self.current_fit = np.polyfit(x, y, 2)
+
+        if len(self.allx) < self.n_samples:
+            self.allx.append(x)
+            self.ally.append(y)
+        else:
+            self.allx.pop(0)
+            self.ally.pop(0)
+
+            self.allx.append(x)
+            self.ally.append(y)
+
+        data_x = self.allx[0]
+        data_y = self.ally[0]
+
+        for n in range(1, len(self.allx)):
+            data_x = np.concatenate((data_x, self.allx[n]), axis=0)
+            data_y = np.concatenate((data_y, self.ally[n]), axis=0)
+
+        self.best_fit = np.polyfit(data_x, data_y, 2)

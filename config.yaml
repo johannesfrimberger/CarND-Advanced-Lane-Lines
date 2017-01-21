@@ -1,13 +1,16 @@
 Video:
   Process: True
   InputFile:
-    - data/videos/short_project_video.mp4
+    - data/videos/project_video.mp4
+    - data/videos/challenge_video.mp4
+    - data/videos/harder_challenge_video.mp4
   StorageFolder: results/videos
+  TrackLanes: True
 Image:
   Process: False
-  InputFolder: data/images
+  InputFolder: data/select_images
   Pattern: test
-  StorageFolder: results/images
+  StorageFolder: results/select_images
   StoreIntermediateResults: True
 CameraCalibration:
   Folder: data/camera_cal
@@ -15,9 +18,9 @@ CameraCalibration:
   UseStoredFile: True
   StorageFolder: results/camera_cal
   ChessboardDimension: (9,6), (9,5), (7,6), (7,4)
-  StoreIntermediateResults: True
+  StoreIntermediateResults: False
 LaneFindingParameters:
   HlsThreshLo: 120
   HlsThreshHi: 255
   SobelXThreshLo: 50
-  SobelXThreshHi: 100
+  SobelXThreshHi: 255

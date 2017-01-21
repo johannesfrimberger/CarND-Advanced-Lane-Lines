@@ -3,6 +3,7 @@ import argparse
 
 from lib.AdvancedLaneFinding import AdvancedLaneFinding
 
+
 def main():
     """
     Read settings file and run AdvancedLaneFinding class with this settings
@@ -23,7 +24,7 @@ def main():
     # Run camera calibration
     alf.run_camera_calibration(settings["CameraCalibration"])
 
-    # Check if video should be processed
+    # Check if a video should be processed
     if settings["Video"]["Process"]:
         alf.processVideo(settings["Video"])
 

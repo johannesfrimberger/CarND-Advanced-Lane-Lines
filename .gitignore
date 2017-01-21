@@ -1,6 +1,4 @@
 # Created by .ignore support plugin (hsz.mobi)
 __pycache__
 .idea
-results/camera_cal
-results/images
-results/videos
+writeup_template.md

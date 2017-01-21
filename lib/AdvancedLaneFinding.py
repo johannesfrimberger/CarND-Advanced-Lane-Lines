@@ -12,6 +12,11 @@ import numpy as np
 import peakutils as pu
 from scipy import signal
 
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import (
+    LinearRegression, TheilSenRegressor, RANSACRegressor, HuberRegressor)
+from sklearn.pipeline import make_pipeline
+
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import *
 
@@ -41,12 +46,16 @@ class AdvancedLaneFinding:
         self.calibration_distortion = 0
 
         # Line objects for left and right lanes
-        self.left_lane = Line()
-        self.right_lane = Line()
+        self.lane_data_valid = False
+        self.lane_left = Line()
+        self.lane_right = Line()
 
         # Parameters for masking the image
         self.mask_outer = [(0, 0), (0, 0), (0, 0), (0, 0)]
         self.mask_inner = [(0, 0), (0, 0), (0, 0), (0, 0)]
+
+        # Parameters for lane tracking
+        self.track_lanes = False
 
         # Set all parameters to default values
         self.reset_parameters()
@@ -241,9 +250,8 @@ class AdvancedLaneFinding:
         sxbinary[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
 
         combined_binary = np.zeros_like(sxbinary)
+        #combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
         combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
-
-        #color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
 
         return combined_binary
 
@@ -304,10 +312,8 @@ class AdvancedLaneFinding:
 
         ind_left, ind_right = lane_pixels
 
-        left_fit = np.polyfit(ind_left[:, 0], ind_left[:, 1], 2)
-        right_fit = np.polyfit(ind_right[:, 0], ind_right[:, 1], 2)
-
-        return left_fit, right_fit
+        self.lane_left.update(ind_left[:, 0], ind_left[:, 1])
+        self.lane_right.update(ind_right[:, 0], ind_right[:, 1])
 
     def draw_lanes(self, left_crv, right_crv, color_image, bev, MInv):
         """
@@ -342,11 +348,11 @@ class AdvancedLaneFinding:
 
         return result
 
-    def findLanes(self, image, keep_memory, store_results=False, storage_folder="", file_name=""):
+    def findLanes(self, image, track_lanes, store_results=False, storage_folder="", file_name=""):
         """
 
         :param image: Image that should be processed
-        :param keep_memory: Use information from previous frames to improve tracking accuracy
+        :param track_lanes: Use information from previous frames to improve tracking accuracy
         :return:
         """
 
@@ -374,21 +380,26 @@ class AdvancedLaneFinding:
         lane_pixels = self.fit_lane(bev)
 
         # 5. Determine curvature of the lane and vehicle position with respect to center
-        left_crv, right_crv = self.calc_curvature(lane_pixels)
+        self.calc_curvature(lane_pixels)
 
         # 6. Warp the detected lane boundaries back onto the original image
-        warped_image = self.draw_lanes(left_crv, right_crv, image, bev, MInv)
+        if track_lanes:
+            left_lane, right_lane = self.lane_left.best_fit, self.lane_right.best_fit
+        else:
+            left_lane, right_lane = self.lane_left.current_fit, self.lane_right.current_fit
+
+        warped_image = self.draw_lanes(left_lane, right_lane, image, bev, MInv)
 
         return warped_image
 
-    def findLanesImage(self, image, keep_memory=False, store_results=False, storage_folder="", file_name=""):
+    def findLanesImage(self, image, store_results=False, storage_folder="", file_name=""):
         """
 
         :param image:
         :param keep_memory:
         :return:
         """
-        return self.findLanes(image, keep_memory, store_results, storage_folder, file_name)
+        return self.findLanes(image, False, store_results, storage_folder, file_name)
 
     def findLanesVideo(self, image):
         """
@@ -396,7 +407,7 @@ class AdvancedLaneFinding:
         :param image:
         :return:
         """
-        return self.findLanes(image, True)
+        return self.findLanes(image, self.track_lanes)
 
     def processVideo(self, settings):
         """
@@ -407,6 +418,7 @@ class AdvancedLaneFinding:
 
         file_names = settings["InputFile"]
         storage_folder = settings["StorageFolder"]
+        self.track_lanes = settings["TrackLanes"]
 
         for file_name in file_names:
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
@@ -417,8 +429,6 @@ class AdvancedLaneFinding:
             input = VideoFileClip(file_name)
             output = input.fl_image(self.findLanesVideo)
             output.write_videofile(output_file, audio=False)
-
-        return 0
 
     def processImageFolder(self, settings):
         """
@@ -442,7 +452,6 @@ class AdvancedLaneFinding:
         for file_name in tqdm(allImages, unit="Image"):
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            mpimg.imsave(output_file, self.findLanesImage(mpimg.imread(file_name), False, store_results,
+            img = mpimg.imread(file_name)
+            mpimg.imsave(output_file, self.findLanesImage(cv2.resize(img, (1280, 720)), store_results,
                                                           storage_folder, file_name))
-
-        return 0

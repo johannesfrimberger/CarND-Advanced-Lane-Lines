@@ -5,6 +5,7 @@ import numpy as np
 This file contains static helper functions to reduce the complexity of AdvancedLaneFinding class
 """
 
+
 def region_of_interest(img, vertices, inverse = False):
     """
     Applies an image mask.
