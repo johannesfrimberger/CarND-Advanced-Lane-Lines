@@ -1,4 +1,9 @@
 # Created by .ignore support plugin (hsz.mobi)
 __pycache__
 .idea
+data
 writeup_template.md
+output_images
+vis.py
+results/calibration1.jpg
+results/calibration_1.jpg

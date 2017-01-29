@@ -341,6 +341,14 @@ class AdvancedLaneFinding:
 
         return result
 
+    def undistort(self, image):
+        """
+
+        :param imgage:
+        :return:
+        """
+        return cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
+
     def findLanes(self, image, track_lanes, store_results=False, storage_folder="", file_name=""):
         """
 

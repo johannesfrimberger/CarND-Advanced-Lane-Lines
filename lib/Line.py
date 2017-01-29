@@ -9,7 +9,7 @@ class Line():
 
         """
         #
-        self.n_samples = 5
+        self.n_samples = 10
 
         # was the line detected in the last iteration?
         self.detected = False
