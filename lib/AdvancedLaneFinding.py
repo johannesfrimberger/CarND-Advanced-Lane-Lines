@@ -15,12 +15,12 @@ from moviepy.editor import *
 
 # Import local files
 from lib.Line import Line
-from lib.Utils import region_of_interest, transform_to_bev
+from lib.Utils import *
 
 
 class AdvancedLaneFinding:
     """
-    AdvancedLaneFinding (alf) provides methods to detect and visualize lanes from a
+    AdvancedLaneFinding (ALF) provides methods to detect and visualize lanes from a
     given video file or single images.
     For pre processing it contains methods to determine the parameters for image rectification.
     """
@@ -59,22 +59,6 @@ class AdvancedLaneFinding:
         """
         self.mask_outer = [(100, 660), (500, 480), (800, 480), (1130, 660)]
         self.mask_inner = [(370, 660), (530, 550), (780, 550), (990, 660)]
-
-    @staticmethod
-    def save_storage(store_results, storage_folder, file_name, identifier, image):
-        """
-
-        :param store_results:
-        :param storage_folder:
-        :param file_name:
-        :param identifier:
-        :param image:
-        :return:
-        """
-        if store_results:
-            output_file = os.path.join(storage_folder, identifier + os.path.basename(file_name))
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            mpimg.imsave(output_file, image)
 
     def run_camera_calibration(self, settings):
         """
@@ -189,7 +173,7 @@ class AdvancedLaneFinding:
             self.calibration_matrix = mtx
             self.calibration_distortion = dist
 
-    def apply_mask(self, image, mask, extend = False, inverse = False):
+    def apply_mask(self, image, mask, extend=False, inverse=False):
         """
         Apply internally stored mask to image
         :param image:
@@ -254,13 +238,12 @@ class AdvancedLaneFinding:
         :param image:
         :return:
         """
-        img_shape = (image.shape[0], image.shape[1])
-
-        histogram = np.sum(image[image.shape[0] / 2:, :], axis=0)
-
+        # Split image plane into left and right side
+        # ToDo: Adapt this to previously found lanes
         left_image = image[:, 0:(image.shape[1]/2)]
         right_image = image[:, (image.shape[1] / 2):]
 
+        # Calculate histogram of points along x-axis and
         left_histogram = np.sum(left_image[left_image.shape[0] / 2:, :], axis=0)
         start_ind_left = np.argmax(left_histogram)
 
@@ -308,43 +291,10 @@ class AdvancedLaneFinding:
         self.lane_left.update(ind_left[:, 0], ind_left[:, 1])
         self.lane_right.update(ind_right[:, 0], ind_right[:, 1])
 
-    def draw_lanes(self, left_crv, right_crv, color_image, bev, MInv):
-        """
-
-        :param left_crv:
-        :param right_crv:
-        :param bev:
-        :return:
-        """
-
-        yvals = np.linspace(0, 100, num=101) * 7.2
-        left_fitx = left_crv[0] * yvals ** 2 + left_crv[1] * yvals + left_crv[2]
-        right_fitx = right_crv[0] * yvals ** 2 + right_crv[1] * yvals + right_crv[2]
-
-        # Create an image to draw the lines on
-        warp_zero = np.zeros_like(bev).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-
-        # Recast the x and y points into usable format for cv2.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, yvals]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, yvals])))])
-        pts = np.hstack((pts_left, pts_right))
-
-        # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
-
-        # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, MInv, (color_image.shape[1], color_image.shape[0]))
-
-        # Combine the result with the original image
-        result = cv2.addWeighted(color_image, 1, newwarp, 0.3, 0)
-
-        return result
-
     def undistort(self, image):
         """
 
-        :param imgage:
+        :param image:
         :return:
         """
         return cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
@@ -360,7 +310,7 @@ class AdvancedLaneFinding:
         # 1. Apply the distortion correction to the raw image
         if self.calibration_available:
             undist = cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
-            self.save_storage(store_results, storage_folder, file_name, "step1_", image)
+            save_storage(store_results, storage_folder, file_name, "step1_", image)
         else:
             print("Camera calibration is not available")
             return image
@@ -370,12 +320,12 @@ class AdvancedLaneFinding:
         binary = self.create_binary_image(masked)
         binary = self.apply_mask(binary, self.mask_outer)
         binary = self.apply_mask(binary, self.mask_inner, inverse=True)
-        self.save_storage(store_results, storage_folder, file_name, "step2_", binary)
+        save_storage(store_results, storage_folder, file_name, "step2_", binary)
 
         # 3. Apply a perspective transform to rectify binary image ("birds-eye view")
         src = np.float32([[190, 720], [583, 460], [705, 460], [1150, 720]])
         bev, MInv = transform_to_bev(binary, src, offset=(300, 0))
-        self.save_storage(store_results, storage_folder, file_name, "step3_", bev)
+        save_storage(store_results, storage_folder, file_name, "step3_", bev)
 
         # 4. Detect lane pixels and fit to find lane boundary
         lane_pixels = self.fit_lane(bev)
@@ -389,7 +339,7 @@ class AdvancedLaneFinding:
         else:
             left_lane, right_lane = self.lane_left.current_fit, self.lane_right.current_fit
 
-        warped_image = self.draw_lanes(left_lane, right_lane, image, bev, MInv)
+        warped_image = draw_lanes(left_lane, right_lane, image, bev, MInv)
 
         return warped_image
 
@@ -410,7 +360,7 @@ class AdvancedLaneFinding:
         """
         return self.findLanes(image, self.track_lanes)
 
-    def processVideo(self, settings):
+    def process_video(self, settings):
         """
 
         :param settings:
@@ -431,7 +381,7 @@ class AdvancedLaneFinding:
             output = input.fl_image(self.findLanesVideo)
             output.write_videofile(output_file, audio=False)
 
-    def processImageFolder(self, settings):
+    def process_image_folder(self, settings):
         """
 
         :param settings:
@@ -447,7 +397,7 @@ class AdvancedLaneFinding:
         # Find all images in given folder
         all_images = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
 
-        print("Start processing images {} in folder {} with pattern {}".format(len(allImages), input_folder, pattern))
+        print("Start processing images {} in folder {} with pattern {}".format(len(all_images), input_folder, pattern))
 
         # Iterate over all images
         for file_name in tqdm(all_images, unit="Image"):

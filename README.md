@@ -25,6 +25,20 @@ The goals / steps of this project are the following:
 
 
 
+| Name | Description |
+|:-------------------------:|:---------:|
+| main.py | Description |
+| AdvancedLaneFinding.py | Description |
+| Line.py | Description |
+| Utils.py | Description |
+| config.yaml | Description |
+
+To start the code you should run
+
+`main.py -s config.yaml`
+
+It will detect lanes for images or videos with the settings configured in the `config.yaml` file.
+
 ###Camera Calibration
 
 ####1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
@@ -36,7 +50,7 @@ It takes the config dictionary read from the yaml section `CameraCalibration` wh
 
 | Name                      | Type      | Description |
 |:-------------------------:|:---------:|:-----------:|
-| Folder                    | String    | Folder to search for |
+| Folder                    | String    | Folder to search for chessboard images |
 | Pattern                   | String    | Pattern of images that should be used |
 | UseStoredFile             | Boolean   | Use stored camera calibration file instead of calculcating from scratch |
 | StorageFolder             | String    | Folder to store calibration file |
@@ -60,6 +74,21 @@ The results of distortion correction can be seen here:
 ![alt text][image1]
 
 ###Pipeline (single images)
+
+Images from a selected folder can be processed using the `process_image_folder` method with the `ALF`
+class.
+
+It takes the config dictionary read from the yaml section `Image` which allows these settings:
+
+| Name                      | Type      | Description |
+|:-------------------------:|:---------:|:-----------:|
+| Process                   | Boolean   | Activate/Deactivate function |
+| InputFolder               | String    | Folder to search for images |
+| Pattern                   | String    | Pattern of images that should be used |
+| StoreIntermediateResults  | Boolean   | Store intermediate results for debugging |
+| StorageFolder             | String    | Folder to store results |
+
+Default settings can be seen in `config.yaml`.
 
 ####1. Provide an example of a distortion-corrected image.
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
@@ -118,6 +147,24 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 ###Pipeline (video)
 
+To process a video you can use the `process_video` method with the `ALF` class.
+
+It takes the config dictionary read from the yaml section `Video` which allows these settings:
+
+| Name                      | Type            | Description |
+|:-------------------------:|:---------------:|:-----------:|
+| Process                   | Boolean         | Activate/Deactivate function |
+| InputFile                 | List of Strings | Videos that should be processed |
+| StorageFolder             | String          | Folder to store results |
+| TrackLanes                | Boolean         | Track lanes between successive frames |
+
+Default settings can be seen in `config.yaml`.
+
+To detect lanes it uses the same methods as described above for single (independent) images.
+Additional it keeps track of the detected lanes to improve stability.
+
+
+
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
 Here's a [link to my video result](./results/project_video.mp4)
@@ -128,5 +175,4 @@ Here's a [link to my video result](./results/project_video.mp4)
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.
 

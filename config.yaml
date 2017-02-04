@@ -10,8 +10,8 @@ Image:
   Process: True
   InputFolder: data/images
   Pattern: test
-  StorageFolder: results/images
   StoreIntermediateResults: True
+  StorageFolder: results/images
 CameraCalibration:
   Folder: data/camera_cal
   Pattern: calibration
