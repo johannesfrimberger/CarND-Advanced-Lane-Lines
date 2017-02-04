@@ -445,12 +445,12 @@ class AdvancedLaneFinding:
         store_results = settings["StoreIntermediateResults"]
 
         # Find all images in given folder
-        allImages = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
+        all_images = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
 
         print("Start processing images {} in folder {} with pattern {}".format(len(allImages), input_folder, pattern))
 
         # Iterate over all images
-        for file_name in tqdm(allImages, unit="Image"):
+        for file_name in tqdm(all_images, unit="Image"):
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             img = mpimg.imread(file_name)

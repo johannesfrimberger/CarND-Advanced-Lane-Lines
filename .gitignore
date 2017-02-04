@@ -7,3 +7,5 @@ output_images
 vis.py
 results/calibration1.jpg
 results/calibration_1.jpg
+results/camera_cal/
+results/images/

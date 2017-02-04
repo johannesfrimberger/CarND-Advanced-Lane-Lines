@@ -15,19 +15,47 @@ The goals / steps of this project are the following:
 
 [image1]: ./results/cam_calibration.png "Undistorted"
 [image2]: ./results/img_process_step1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
+[image3]: ./results/img_process_step2.jpg "Binary Example"
+[image4]: ./results/img_process_step3.jpg "Warp Example"
+[image5]: ./results/img_process_step4.jpg "Fit Visual"
+[image6]: ./results/img_process_step5.jpg "Output"
 [video1]: ./results/project_video.mp4 "Video"
+
+###Code Structure
+
+
 
 ###Camera Calibration
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).
+####1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.
+The code used for camera calibration is located inside the `ALF` class and can be executed using
+the `run_camera_calibration` method.
 
-I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result:
+It takes the config dictionary read from the yaml section `CameraCalibration` which allows these settings:
+
+| Name                      | Type      | Description |
+|:-------------------------:|:---------:|:-----------:|
+| Folder                    | String    | Folder to search for |
+| Pattern                   | String    | Pattern of images that should be used |
+| UseStoredFile             | Boolean   | Use stored camera calibration file instead of calculcating from scratch |
+| StorageFolder             | String    | Folder to store calibration file |
+| ChessboardDimension       | Tuple     | Possible chessboard dimension to look for |
+| StoreIntermediateResults  | Boolean   | Store intermediate results for debugging |
+
+Default settings can be seen in `config.yaml`.
+
+The `run_camera_calibration` method assumes that the chessboard is fixed at the (x,y) plane
+with z=0 and that the same chessboard is used in all images.
+
+It then iterates over all images and checks if one of the possible chessboard dimensions fits
+the image. Multiple dimensions are used as in some images the chessboard corners are hidden.
+
+The findings are stored within a single list and processed by the OpenCv `cv2.calibrateCamera()`
+method returning the distortion correction. This can be applied to any image taken with the same
+camera using the `cv2.undistort()`.
+
+The results of distortion correction can be seen here:
 
 ![alt text][image1]
 
@@ -48,26 +76,23 @@ I used a combination of color and gradient thresholds to generate a binary image
 The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
 
 ```
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
+src = np.float32([[190, 720], [583, 460], [705, 460], [1150, 720]])
+dst = np.float32([
+        [offset[0], img_size[1] - offset[1]],
+        [offset[0], offset[1]],
+        [img_size[0] - offset[0], offset[1]],
+        [img_size[0] - offset[0], img_size[1] - offset[1]]
+    ])
 
 ```
 This resulted in the following source and destination points:
 
 | Source        | Destination   |
 |:-------------:|:-------------:|
-| 585, 460      | 320, 0        |
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+| 190, 720      | 300, 720      |
+| 583, 460      | 300, 0        |
+| 705, 460      | 980, 0        |
+| 1150, 720     | 980, 720      |
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 

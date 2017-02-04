@@ -6,13 +6,15 @@ This file contains static helper functions to reduce the complexity of AdvancedL
 """
 
 
-def region_of_interest(img, vertices, inverse = False):
+def region_of_interest(img, vertices, inverse=False):
     """
-    Applies an image mask.
 
-    Only keeps the region of the image defined by the polygon
-    formed from `vertices`. The rest of the image is set to black.
+    :param img:
+    :param vertices:
+    :param inverse:
+    :return:
     """
+
     # defining a blank mask to start with
     mask = np.zeros_like(img)
 
@@ -40,10 +42,10 @@ def region_of_interest(img, vertices, inverse = False):
 def transform_to_bev(image, src, offset=(0, 0)):
     """
     Transform input image to birds eye view
-    :param image: grayscale image
-    :param src: grayscale image
-    :param offset: grayscale image
-    :return: image in birds eye view
+    :param image: image that should be transformed
+    :param src:
+    :param offset:
+    :return: image in birds eye view and inverse transformation matrix
     """
     img_size = (image.shape[1], image.shape[0])
 
@@ -53,6 +55,8 @@ def transform_to_bev(image, src, offset=(0, 0)):
         [img_size[0] - offset[0], offset[1]],
         [img_size[0] - offset[0], img_size[1] - offset[1]]
     ])
+
+    print(dst)
 
     M = cv2.getPerspectiveTransform(src, dst)
     MInv = cv2.getPerspectiveTransform(dst, src)

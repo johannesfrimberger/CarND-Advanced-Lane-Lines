@@ -6,9 +6,8 @@ from lib.AdvancedLaneFinding import AdvancedLaneFinding
 
 def main():
     """
-    Read settings file and run AdvancedLaneFinding class with this settings
+    Read settings file and run AdvancedLaneFinding class with these settings
     """
-
     # Set parser for inputs
     parser = argparse.ArgumentParser(description="Processing input arguments")
     parser.add_argument("-s", "--settings_file", help="Set yaml settings file", required=True)

@@ -1,16 +1,16 @@
 Video:
-  Process: True
+  Process: False
   InputFile:
     - data/videos/project_video.mp4
-    - data/videos/challenge_video.mp4
-    - data/videos/harder_challenge_video.mp4
+    #- data/videos/challenge_video.mp4
+    #- data/videos/harder_challenge_video.mp4
   StorageFolder: results/videos
   TrackLanes: True
 Image:
-  Process: False
-  InputFolder: data/select_images
+  Process: True
+  InputFolder: data/images
   Pattern: test
-  StorageFolder: results/select_images
+  StorageFolder: results/images
   StoreIntermediateResults: True
 CameraCalibration:
   Folder: data/camera_cal

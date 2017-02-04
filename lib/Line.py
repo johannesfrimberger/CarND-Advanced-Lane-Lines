@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Line():
     """
     Class to hold and
@@ -26,13 +27,19 @@ class Line():
         # distance in meters of vehicle center from the line
         self.line_base_pos = None
         # difference in fit coefficients between last and new fits
-        self.diffs = np.array([0,0,0], dtype='float')
+        self.diffs = np.array([0, 0, 0], dtype='float')
         # x values for detected line pixels
         self.allx = []
         # y values for detected line pixels
         self.ally = []
 
     def update(self, x, y):
+        """
+
+        :param x:
+        :param y:
+        :return:
+        """
         self.current_fit = np.polyfit(x, y, 2)
 
         if len(self.allx) < self.n_samples:
