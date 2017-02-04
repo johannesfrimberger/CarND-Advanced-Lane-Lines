@@ -9,7 +9,7 @@ Video:
 Image:
   Process: True
   InputFolder: data/images
-  Pattern: test
+  Pattern: test0
   StoreIntermediateResults: True
   StorageFolder: results/images
 CameraCalibration:

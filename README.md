@@ -16,28 +16,28 @@ The goals / steps of this project are the following:
 [image1]: ./results/cam_calibration.png "Undistorted"
 [image2]: ./results/img_process_step1.jpg "Road Transformed"
 [image3]: ./results/img_process_step2.jpg "Binary Example"
-[image4]: ./results/img_process_step3.jpg "Warp Example"
+[image4]: ./results/img_process_step3.png "Warp Example"
 [image5]: ./results/img_process_step4.jpg "Fit Visual"
 [image6]: ./results/img_process_step5.jpg "Output"
 [video1]: ./results/project_video.mp4 "Video"
 
 ###Code Structure
 
-
+The
 
 | Name | Description |
 |:-------------------------:|:---------:|
-| main.py | Description |
-| AdvancedLaneFinding.py | Description |
-| Line.py | Description |
-| Utils.py | Description |
-| config.yaml | Description |
+| main.py | Main method to read settings and run lane finding algo |
+| AdvancedLaneFinding.py | Contains AdvancedLaneFinding (ALF) class |
+| Line.py | Implementation of Line class storing lane information |
+| Utils.py | Static methods used within ALF |
+| config.yaml | Settings file to configure ALF |
 
 To start the code you should run
 
 `main.py -s config.yaml`
 
-It will detect lanes for images or videos with the settings configured in the `config.yaml` file.
+It will detect lanes for images and/or videos with the settings choosen in the `config.yaml` file.
 
 ###Camera Calibration
 
@@ -163,9 +163,15 @@ Default settings can be seen in `config.yaml`.
 To detect lanes it uses the same methods as described above for single (independent) images.
 Additional it keeps track of the detected lanes to improve stability.
 
+####1. Averaging over multiple frames
 
 
-####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+
+####2. Adapt search window
+
+
+
+####3. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
 Here's a [link to my video result](./results/project_video.mp4)
 
@@ -174,5 +180,4 @@ Here's a [link to my video result](./results/project_video.mp4)
 ###Discussion
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
-
 

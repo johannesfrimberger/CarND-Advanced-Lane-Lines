@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import matplotlib.image as mpimg
+import os
 
 """
 This file contains static helper functions to reduce the complexity of AdvancedLaneFinding class
@@ -56,8 +58,6 @@ def transform_to_bev(image, src, offset=(0, 0)):
         [img_size[0] - offset[0], img_size[1] - offset[1]]
     ])
 
-    print(dst)
-
     M = cv2.getPerspectiveTransform(src, dst)
     MInv = cv2.getPerspectiveTransform(dst, src)
 
@@ -77,10 +77,14 @@ def save_storage(store_results, storage_folder, file_name, identifier, image):
     if store_results:
         output_file = os.path.join(storage_folder, identifier + os.path.basename(file_name))
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        mpimg.imsave(output_file, image)
+        imsize = image.shape
+        if len(imsize) == 2:
+            cv2.imwrite(output_file, cv2.cvtColor(image * 255, cv2.COLOR_GRAY2RGB))
+        else:
+            mpimg.imsave(output_file, image)
 
 
-def draw_lanes(self, left_crv, right_crv, color_image, bev, MInv):
+def draw_lanes(left_crv, right_crv, color_image, bev, MInv):
     """
 
     :param left_crv:
