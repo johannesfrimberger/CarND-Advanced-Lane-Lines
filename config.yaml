@@ -1,5 +1,5 @@
 Video:
-  Process: False
+  Process: True
   InputFile:
     - data/videos/project_video.mp4
     #- data/videos/challenge_video.mp4
@@ -9,7 +9,7 @@ Video:
 Image:
   Process: True
   InputFolder: data/images
-  Pattern: test0
+  Pattern: test3
   StoreIntermediateResults: True
   StorageFolder: results/images
 CameraCalibration:
@@ -20,7 +20,7 @@ CameraCalibration:
   ChessboardDimension: (9,6), (9,5), (7,6), (7,4)
   StoreIntermediateResults: False
 LaneFindingParameters:
-  HlsThreshLo: 120
+  HlsThreshLo: 170
   HlsThreshHi: 255
-  SobelXThreshLo: 50
-  SobelXThreshHi: 255
+  SobelXThreshLo: 20
+  SobelXThreshHi: 100

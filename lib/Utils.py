@@ -84,7 +84,7 @@ def save_storage(store_results, storage_folder, file_name, identifier, image):
             mpimg.imsave(output_file, image)
 
 
-def draw_lanes(left_crv, right_crv, color_image, bev, MInv):
+def draw_lanes(left_crv, right_crv, color_image, bev, MInv, radius, position):
     """
 
     :param left_crv:
@@ -115,4 +115,59 @@ def draw_lanes(left_crv, right_crv, color_image, bev, MInv):
     # Combine the result with the original image
     result = cv2.addWeighted(color_image, 1, newwarp, 0.3, 0)
 
+    #
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(result, 'Radius of curve = {:d} (m)'.format(int(radius)),
+                (300, 50), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(result, 'Vehicle is {:.2f}m left of the center'.format(position),
+                (300, 80), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
+
     return result
+
+
+def radius_and_position(left_lane, right_lane, y_eval, hor_center):
+    """
+
+    :param left_lane:
+    :param right_lane:
+    :param y_eval:
+    :param hor_center:
+    :return:
+    """
+    left_curverad = ((1 + (2 * left_lane[0] * y_eval + left_lane[1]) ** 2) ** 1.5) / np.absolute(2 * left_lane[0])
+    right_curverad = ((1 + (2 * right_lane[0] * y_eval + right_lane[1]) ** 2) ** 1.5) / np.absolute(2 * right_lane[0])
+    radius = (left_curverad + right_curverad) / 2.0
+
+    left_position = left_lane[0] * y_eval ** 2 + left_lane[1] * y_eval + left_lane[2]
+    right_position = right_lane[0] * y_eval ** 2 + right_lane[1] * y_eval + right_lane[2]
+    scaling = 4.0 / (right_position - left_position)
+
+    position = (hor_center - ((right_position - left_position) / 2.0) - left_position) * scaling
+
+    return radius, position
+
+
+def apply_mask(image, mask, extend=False, inverse=False):
+    """
+    Apply internally stored mask to image
+    :param image: Image that should be masked
+    :param mask: Mask that should be used
+    :param extend: Add additional boundaries to mask
+    :param inverse: Use inverse mask (everything else is kept except mask)
+    :return: Masked image
+    """
+    mask_bl = mask[0]
+    mask_tl = mask[1]
+    mask_tr = mask[2]
+    mask_br = mask[3]
+
+    if extend:
+        mask_bl = (mask_bl[0] - 50, mask_bl[1] + 50)
+        mask_tl = (mask_tl[0] - 50, mask_tl[1] - 50)
+        mask_tr = (mask_tr[0] + 50, mask_tr[1] - 50)
+        mask_br = (mask_br[0] + 50, mask_br[1] + 50)
+
+    vertices = np.array([[mask_bl, mask_tl, mask_tr, mask_br]],
+                        dtype=np.int32)
+
+    return region_of_interest(image, vertices, inverse)

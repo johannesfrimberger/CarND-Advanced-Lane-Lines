@@ -57,8 +57,8 @@ class AdvancedLaneFinding:
         """
 
         """
-        self.mask_outer = [(100, 660), (500, 480), (800, 480), (1130, 660)]
-        self.mask_inner = [(370, 660), (530, 550), (780, 550), (990, 660)]
+        self.mask_outer = [(100, 710), (500, 480), (800, 480), (1180, 710)]
+        self.mask_inner = [(420, 710), (590, 500), (720, 500), (900, 710)]
 
     def run_camera_calibration(self, settings):
         """
@@ -173,35 +173,10 @@ class AdvancedLaneFinding:
             self.calibration_matrix = mtx
             self.calibration_distortion = dist
 
-    def apply_mask(self, image, mask, extend=False, inverse=False):
-        """
-        Apply internally stored mask to image
-        :param image:
-        :param mask:
-        :param extend:
-        :return:
-        """
-        mask_bl = mask[0]
-        mask_tl = mask[1]
-        mask_tr = mask[2]
-        mask_br = mask[3]
-
-        if extend:
-            # TODO: Check that boundaries are not exceeded
-            mask_bl = (mask_bl[0] - 50, mask_bl[1] + 50)
-            mask_tl = (mask_tl[0] - 50, mask_tl[1] - 50)
-            mask_tr = (mask_tr[0] + 50, mask_tr[1] - 50)
-            mask_br = (mask_br[0] + 50, mask_br[1] + 50)
-
-        vertices = np.array([[mask_bl, mask_tl, mask_tr, mask_br]],
-                        dtype=np.int32)
-
-        return region_of_interest(image, vertices, inverse)
-
     def create_binary_image(self, image):
         """
-        Apply threhshold on HLS s channel and sobel x direction
-        :param image: Image that should be thresholded
+        Apply threshold on HLS s channel and apply sobel to x direction
+        :param image: Image that should be converted to binary
         :return: binary_image
         """
         # Pre process image data (e.g. convert to color spaces)
@@ -227,57 +202,112 @@ class AdvancedLaneFinding:
         sxbinary[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
 
         combined_binary = np.zeros_like(sxbinary)
-        #combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
         combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
 
         return combined_binary
 
-    def fit_lane(self, image):
-        """
+    def fit_lane(self, image, tracking=False):
 
-        :param image:
-        :return:
-        """
-        # Split image plane into left and right side
-        # ToDo: Adapt this to previously found lanes
-        left_image = image[:, 0:(image.shape[1]/2)]
-        right_image = image[:, (image.shape[1] / 2):]
+        if tracking and self.lane_left.detected and self.lane_right.detected:
+            # Assume you now have a new warped binary image
+            # from the next frame of video (also called "binary_warped")
+            # It's now much easier to find line pixels!
+            nonzero = image.nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
+            margin = 100
 
-        # Calculate histogram of points along x-axis and
-        left_histogram = np.sum(left_image[left_image.shape[0] / 2:, :], axis=0)
-        start_ind_left = np.argmax(left_histogram)
+            left_fit = self.lane_left.best_fit
+            right_fit = self.lane_right.best_fit
 
-        right_histogram = np.sum(right_image[right_image.shape[0] / 2:, :], axis=0)
-        start_ind_right = np.argmax(right_histogram) + (image.shape[1] / 2)
+            left_lane_inds = (
+                (nonzerox > (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy + left_fit[2] - margin)) & (
+                    nonzerox < (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy + left_fit[2] + margin)))
+            right_lane_inds = (
+                (nonzerox > (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy + right_fit[2] - margin)) & (
+                    nonzerox < (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy + right_fit[2] + margin)))
 
-        search_window = 200 / 2
+            # Again, extract left and right line pixel positions
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds]
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
 
-        and_image = np.zeros_like(image)
-        and_image[:, (start_ind_left-search_window):(start_ind_left+search_window)] = 1
-        and_image[:, (start_ind_right - search_window):(start_ind_right + search_window)] = 1
+        else:
 
-        slices = 90
+            # Assuming you have created a warped binary image called "binary_warped"
+            # Take a histogram of the bottom half of the image
+            histogram = np.sum(image[image.shape[0] / 2:, :], axis=0)
 
-        ind_left = np.zeros(shape=(0, 2))
-        ind_right = np.zeros(shape=(0, 2))
+            # Create an output image to draw on and  visualize the result
+            out_img = np.dstack((image, image, image)) * 255
 
-        for bottom in range(image.shape[0], 0, -slices):
-            image_slice = image[(bottom-slices):bottom, :]
+            # Find the peak of the left and right halves of the histogram
+            # These will be the starting point for the left and right lines
+            midpoint = np.int(histogram.shape[0] / 2)
+            leftx_base = np.argmax(histogram[:midpoint])
+            rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
-            l = np.array(np.where(
-                image_slice[:, (start_ind_left - search_window):(start_ind_left + search_window)] > 0)).transpose()
-            r = np.array(np.where(
-                image_slice[:, (start_ind_right - search_window):(start_ind_right + search_window)] > 0)).transpose()
+            # Choose the number of sliding windows
+            nwindows = 9
+            # Set height of windows
+            window_height = np.int(image.shape[0] / nwindows)
+            # Identify the x and y positions of all nonzero pixels in the image
+            nonzero = image.nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
 
-            l = l + ((bottom-slices), (start_ind_left - search_window))
-            r = r + ((bottom - slices), (start_ind_right - search_window))
+            # Current positions to be updated for each window
+            leftx_current = leftx_base
+            rightx_current = rightx_base
 
-            if l.shape[0] > 0:
-                ind_left = np.concatenate((ind_left, l), axis=0)
-            if r.shape[0] > 0:
-                ind_right = np.concatenate((ind_right, r), axis=0)
+            # Set the width of the windows +/- margin
+            margin = 100
+            # Set minimum number of pixels found to recenter window
+            minpix = 50
 
-        return ind_left, ind_right
+            # Create empty lists to receive left and right lane pixel indices
+            left_lane_inds = []
+            right_lane_inds = []
+
+            # Step through the windows one by one
+            for window in range(nwindows):
+                # Identify window boundaries in x and y (and right and left)
+                win_y_low = image.shape[0] - (window + 1) * window_height
+                win_y_high = image.shape[0] - window * window_height
+                win_xleft_low = leftx_current - margin
+                win_xleft_high = leftx_current + margin
+                win_xright_low = rightx_current - margin
+                win_xright_high = rightx_current + margin
+
+                # Identify the nonzero pixels in x and y within the window
+                good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (
+                nonzerox < win_xleft_high)).nonzero()[0]
+                good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (
+                nonzerox < win_xright_high)).nonzero()[0]
+                # Append these indices to the lists
+                left_lane_inds.append(good_left_inds)
+                right_lane_inds.append(good_right_inds)
+                # If you found > minpix pixels, recenter next window on their mean position
+                if len(good_left_inds) > minpix:
+                    leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
+                if len(good_right_inds) > minpix:
+                    rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
+
+            # Concatenate the arrays of indices
+            left_lane_inds = np.concatenate(left_lane_inds)
+            right_lane_inds = np.concatenate(right_lane_inds)
+
+            # Extract left and right line pixel positions
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds]
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
+
+        data_left = np.reshape(np.concatenate((lefty, leftx)), (2, -1)).transpose()
+        data_right = np.reshape(np.concatenate((righty, rightx)), (2, -1)).transpose()
+
+        return data_left, data_right
 
     def calc_curvature(self, lane_pixels):
         """
@@ -293,17 +323,20 @@ class AdvancedLaneFinding:
 
     def undistort(self, image):
         """
-
-        :param image:
-        :return:
+        Undistort input image with internally stored camera calibration matrix
+        :param image: Input image
+        :return: Undistorted image
         """
         return cv2.undistort(image, self.calibration_matrix, self.calibration_distortion, None, self.calibration_matrix)
 
-    def findLanes(self, image, track_lanes, store_results=False, storage_folder="", file_name=""):
+    def find_lanes(self, image, track_lanes, store_results=False, storage_folder="", file_name=""):
         """
 
-        :param image: Image that should be processed
-        :param track_lanes: Use information from previous frames to improve tracking accuracy
+        :param image:
+        :param track_lanes:
+        :param store_results:
+        :param storage_folder:
+        :param file_name:
         :return:
         """
 
@@ -316,10 +349,9 @@ class AdvancedLaneFinding:
             return image
 
         # 2. Use color transforms, gradients, etc., to create a thresholded binary image.
-        masked = self.apply_mask(undist, self.mask_outer, extend=True)
-        binary = self.create_binary_image(masked)
-        binary = self.apply_mask(binary, self.mask_outer)
-        binary = self.apply_mask(binary, self.mask_inner, inverse=True)
+        binary = self.create_binary_image(undist)
+        binary = apply_mask(binary, self.mask_outer)
+        binary = apply_mask(binary, self.mask_inner, inverse=True)
         save_storage(store_results, storage_folder, file_name, "step2_", binary)
 
         # 3. Apply a perspective transform to rectify binary image ("birds-eye view")
@@ -328,43 +360,46 @@ class AdvancedLaneFinding:
         save_storage(store_results, storage_folder, file_name, "step3_", bev)
 
         # 4. Detect lane pixels and fit to find lane boundary
-        lane_pixels = self.fit_lane(bev)
+        lane_pixels = self.fit_lane(bev, track_lanes)
 
         # 5. Determine curvature of the lane and vehicle position with respect to center
         self.calc_curvature(lane_pixels)
 
-        # 6. Warp the detected lane boundaries back onto the original image
+        # 6.
         if track_lanes:
             left_lane, right_lane = self.lane_left.best_fit, self.lane_right.best_fit
         else:
             left_lane, right_lane = self.lane_left.current_fit, self.lane_right.current_fit
 
-        warped_image = draw_lanes(left_lane, right_lane, image, bev, MInv)
+        # 7. Warp the detected lane boundaries back onto the original image
+        radius, position = radius_and_position(left_lane, right_lane, 700, 640)
+        warped_image = draw_lanes(left_lane, right_lane, image, bev, MInv, radius, position)
 
         return warped_image
 
-    def findLanesImage(self, image, store_results=False, storage_folder="", file_name=""):
+    def find_lanes_image(self, image, store_results=False, storage_folder="", file_name=""):
         """
+        Detect and visualize lane boundaries for a standalone image
+        :param image: Image to process
+        :param store_results: Store intermediate results
+        :param storage_folder: Folder to store results and intermediate results
+        :param file_name: Filename extension for intermediate results
+        :return: Image with visualized lane boundaries
+        """
+        return self.find_lanes(image, False, store_results, storage_folder, file_name)
 
-        :param image:
-        :param keep_memory:
-        :return:
+    def find_lanes_video(self, image):
         """
-        return self.findLanes(image, False, store_results, storage_folder, file_name)
-
-    def findLanesVideo(self, image):
+        Wrapper method to detect lanes with VideoFileClip methods
+        :param image: Signle image from video file
+        :return: Image with visualized lane boundaries
         """
-
-        :param image:
-        :return:
-        """
-        return self.findLanes(image, self.track_lanes)
+        return self.find_lanes(image, self.track_lanes)
 
     def process_video(self, settings):
         """
-
-        :param settings:
-        :return:
+        Process video defined in settings file and detect lane boundaries
+        :param settings: Settings file for video processing
         """
 
         file_names = settings["InputFile"]
@@ -378,16 +413,14 @@ class AdvancedLaneFinding:
             print("Start processing video {} and save it as {}".format(file_name, output_file))
 
             input = VideoFileClip(file_name)
-            output = input.fl_image(self.findLanesVideo)
+            output = input.fl_image(self.find_lanes_video)
             output.write_videofile(output_file, audio=False)
 
     def process_image_folder(self, settings):
         """
-
-        :param settings:
-        :return:
+        Read images in input folder and detect lane boundaries
+        :param settings: Settings file for image processing
         """
-
         # Read settings
         input_folder = settings["InputFolder"]
         storage_folder = settings["StorageFolder"]
@@ -404,5 +437,5 @@ class AdvancedLaneFinding:
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             img = mpimg.imread(file_name)
-            mpimg.imsave(output_file, self.findLanesImage(cv2.resize(img, (1280, 720)), store_results,
-                                                          storage_folder, file_name))
+            mpimg.imsave(output_file, self.find_lanes_image(cv2.resize(img, (1280, 720)), store_results,
+                                                            storage_folder, file_name))
