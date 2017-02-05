@@ -9,7 +9,7 @@ Video:
 Image:
   Process: True
   InputFolder: data/images
-  Pattern: test3
+  Pattern: test
   StoreIntermediateResults: True
   StorageFolder: results/images
 CameraCalibration:
@@ -20,7 +20,7 @@ CameraCalibration:
   ChessboardDimension: (9,6), (9,5), (7,6), (7,4)
   StoreIntermediateResults: False
 LaneFindingParameters:
-  HlsThreshLo: 170
+  HlsThreshLo: 140
   HlsThreshHi: 255
-  SobelXThreshLo: 20
+  SobelXThreshLo: 40
   SobelXThreshHi: 100

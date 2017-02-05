@@ -10,13 +10,12 @@ This file contains static helper functions to reduce the complexity of AdvancedL
 
 def region_of_interest(img, vertices, inverse=False):
     """
-
-    :param img:
-    :param vertices:
-    :param inverse:
-    :return:
+    Apply an region of interest/mask to the input image
+    :param img: Input image
+    :param vertices: Region that should be masked
+    :param inverse: Apply inverse mask
+    :return: Masked image
     """
-
     # defining a blank mask to start with
     mask = np.zeros_like(img)
 
@@ -66,13 +65,12 @@ def transform_to_bev(image, src, offset=(0, 0)):
 
 def save_storage(store_results, storage_folder, file_name, identifier, image):
     """
-
-    :param store_results:
-    :param storage_folder:
-    :param file_name:
-    :param identifier:
-    :param image:
-    :return:
+    Store intermediate results if requested
+    :param store_results: Should results be stored
+    :param storage_folder: Folder to store image
+    :param file_name: Base filename of the current image
+    :param identifier: Prefix used to store image
+    :param image: image to store
     """
     if store_results:
         output_file = os.path.join(storage_folder, identifier + os.path.basename(file_name))
@@ -86,11 +84,16 @@ def save_storage(store_results, storage_folder, file_name, identifier, image):
 
 def draw_lanes(left_crv, right_crv, color_image, bev, MInv, radius, position):
     """
-
-    :param left_crv:
-    :param right_crv:
-    :param bev:
-    :return:
+    Annotate image with highlighting the currently detected lanes and printing
+    radius and position of the car
+    :param left_crv: Curvature of left lane
+    :param right_crv: Curvature of right lane
+    :param color_image: Image that should be annotated
+    :param bev: Lane image in birds-eye view
+    :param MInv: Inverse transformation matrix to map bev image to "normal" perspective
+    :param radius: Currently estimated curvature
+    :param position: Currently estimated position in respect to center
+    :return: Annotated image
     """
 
     yvals = np.linspace(0, 100, num=101) * 7.2
@@ -115,7 +118,7 @@ def draw_lanes(left_crv, right_crv, color_image, bev, MInv, radius, position):
     # Combine the result with the original image
     result = cv2.addWeighted(color_image, 1, newwarp, 0.3, 0)
 
-    #
+    # Place an information about the current curve radius and distance to the center
     font = cv2.FONT_HERSHEY_SIMPLEX
     cv2.putText(result, 'Radius of curve = {:d} (m)'.format(int(radius)),
                 (300, 50), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
@@ -125,13 +128,14 @@ def draw_lanes(left_crv, right_crv, color_image, bev, MInv, radius, position):
     return result
 
 
-def radius_and_position(left_lane, right_lane, y_eval, hor_center):
+def radius_and_position(left_lane, right_lane, y_eval, hor_center, lane_width):
     """
-
-    :param left_lane:
-    :param right_lane:
-    :param y_eval:
-    :param hor_center:
+    Calculate radius and position of the car in respect to the center
+    :param left_lane: Polyfit parameters for left lane
+    :param right_lane: Polyfit parameters for right lane
+    :param y_eval: Y position where the curvature and position should be evaluated
+    :param hor_center: Horizontal center of the image
+    :param lane_width: Lane width in meter (deals as reference)
     :return:
     """
     left_curverad = ((1 + (2 * left_lane[0] * y_eval + left_lane[1]) ** 2) ** 1.5) / np.absolute(2 * left_lane[0])
@@ -140,7 +144,7 @@ def radius_and_position(left_lane, right_lane, y_eval, hor_center):
 
     left_position = left_lane[0] * y_eval ** 2 + left_lane[1] * y_eval + left_lane[2]
     right_position = right_lane[0] * y_eval ** 2 + right_lane[1] * y_eval + right_lane[2]
-    scaling = 4.0 / (right_position - left_position)
+    scaling = lane_width/ (right_position - left_position)
 
     position = (hor_center - ((right_position - left_position) / 2.0) - left_position) * scaling
 

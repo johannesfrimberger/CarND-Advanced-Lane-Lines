@@ -7,7 +7,7 @@ class Line():
     """
     def __init__(self):
         """
-
+        Initialize class
         """
         #
         self.n_samples = 10
@@ -31,16 +31,17 @@ class Line():
 
     def update(self, x, y):
         """
-
-        :param x:
-        :param y:
-        :return:
+        Update internal storage of lane detection
+        :param x: relevant points in x-direction
+        :param y: relevant points in y-direction
         """
 
+        # Calculate current fit
         current_fit = np.polyfit(x, y, 2)
 
+        # If lanes where detected in the previous frame low pass information
         if self.detected:
-            alpha = 0.05
+            alpha = 0.1
             self.best_fit = (1.0 - alpha) * self.best_fit + alpha * current_fit
         else:
             self.best_fit = current_fit

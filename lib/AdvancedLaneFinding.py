@@ -27,7 +27,7 @@ class AdvancedLaneFinding:
 
     def __init__(self, settings):
         """
-
+        Initialize class with settings file
         :param settings: Settings for lane finding
         """
         # Store settings for lane finding pipeline
@@ -55,7 +55,7 @@ class AdvancedLaneFinding:
 
     def reset_parameters(self):
         """
-
+        Reset internal parameters
         """
         self.mask_outer = [(100, 710), (500, 480), (800, 480), (1180, 710)]
         self.mask_inner = [(420, 710), (590, 500), (720, 500), (900, 710)]
@@ -177,7 +177,7 @@ class AdvancedLaneFinding:
         """
         Apply threshold on HLS s channel and apply sobel to x direction
         :param image: Image that should be converted to binary
-        :return: binary_image
+        :return: binary image that indicates possible lane points
         """
         # Pre process image data (e.g. convert to color spaces)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -234,13 +234,8 @@ class AdvancedLaneFinding:
             righty = nonzeroy[right_lane_inds]
 
         else:
-
-            # Assuming you have created a warped binary image called "binary_warped"
             # Take a histogram of the bottom half of the image
             histogram = np.sum(image[image.shape[0] / 2:, :], axis=0)
-
-            # Create an output image to draw on and  visualize the result
-            out_img = np.dstack((image, image, image)) * 255
 
             # Find the peak of the left and right halves of the histogram
             # These will be the starting point for the left and right lines
@@ -250,8 +245,10 @@ class AdvancedLaneFinding:
 
             # Choose the number of sliding windows
             nwindows = 9
+
             # Set height of windows
             window_height = np.int(image.shape[0] / nwindows)
+
             # Identify the x and y positions of all nonzero pixels in the image
             nonzero = image.nonzero()
             nonzeroy = np.array(nonzero[0])
@@ -263,6 +260,7 @@ class AdvancedLaneFinding:
 
             # Set the width of the windows +/- margin
             margin = 100
+
             # Set minimum number of pixels found to recenter window
             minpix = 50
 
@@ -272,6 +270,7 @@ class AdvancedLaneFinding:
 
             # Step through the windows one by one
             for window in range(nwindows):
+
                 # Identify window boundaries in x and y (and right and left)
                 win_y_low = image.shape[0] - (window + 1) * window_height
                 win_y_high = image.shape[0] - window * window_height
@@ -285,9 +284,11 @@ class AdvancedLaneFinding:
                 nonzerox < win_xleft_high)).nonzero()[0]
                 good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (
                 nonzerox < win_xright_high)).nonzero()[0]
+
                 # Append these indices to the lists
                 left_lane_inds.append(good_left_inds)
                 right_lane_inds.append(good_right_inds)
+
                 # If you found > minpix pixels, recenter next window on their mean position
                 if len(good_left_inds) > minpix:
                     leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
@@ -311,11 +312,9 @@ class AdvancedLaneFinding:
 
     def calc_curvature(self, lane_pixels):
         """
-
-        :param lane_pixels:
-        :return:
+        Update left and right lane estimation with latest findings
+        :param lane_pixels: Detected lane pixels within this frame/image
         """
-
         ind_left, ind_right = lane_pixels
 
         self.lane_left.update(ind_left[:, 0], ind_left[:, 1])
@@ -331,13 +330,13 @@ class AdvancedLaneFinding:
 
     def find_lanes(self, image, track_lanes, store_results=False, storage_folder="", file_name=""):
         """
-
-        :param image:
-        :param track_lanes:
-        :param store_results:
-        :param storage_folder:
-        :param file_name:
-        :return:
+        Run entire algorithm for lane detection and annotate image
+        :param image: RGB image input
+        :param track_lanes: Use information of previous frames (only recommended for videos)
+        :param store_results: Store intermediate results
+        :param storage_folder: Folder to store results and intermediate results
+        :param file_name: Prefix for intermediate results
+        :return: annotated image
         """
 
         # 1. Apply the distortion correction to the raw image
@@ -365,14 +364,14 @@ class AdvancedLaneFinding:
         # 5. Determine curvature of the lane and vehicle position with respect to center
         self.calc_curvature(lane_pixels)
 
-        # 6.
+        # 6. Use previous information and low pass lane detection results
         if track_lanes:
             left_lane, right_lane = self.lane_left.best_fit, self.lane_right.best_fit
         else:
             left_lane, right_lane = self.lane_left.current_fit, self.lane_right.current_fit
 
         # 7. Warp the detected lane boundaries back onto the original image
-        radius, position = radius_and_position(left_lane, right_lane, 700, 640)
+        radius, position = radius_and_position(left_lane, right_lane, 700, 640, 4.0)
         warped_image = draw_lanes(left_lane, right_lane, image, bev, MInv, radius, position)
 
         return warped_image
