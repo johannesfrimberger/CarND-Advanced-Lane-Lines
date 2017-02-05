@@ -20,12 +20,11 @@ The goals / steps of this project are the following:
 [image5]: ./results/img_process_step4.png "Fit Visual"
 [image6]: ./results/img_process_step5.jpg "Output"
 [video1]: ./results/project_video.mp4 "Video"
-[video2]: ./results/video_step_1.png "Video Low Pass Filter"
-[video3]: ./results/video_step_2.png "Video Search Window Adaption"
+[video2]: ./results/video_step_1.png "Video Search Window Adaption"
 
 ###Code Structure
 
-The
+File-Overview:
 
 | Name | Description |
 |:-------------------------:|:---------:|
@@ -39,7 +38,7 @@ To start the code you should run
 
 `main.py -s config.yaml`
 
-It will detect lanes for images and/or videos with the settings choosen in the `config.yaml` file.
+It will detect lanes for images and/or videos with the settings chosen in the `config.yaml` file.
 
 ###Camera Calibration
 
@@ -106,10 +105,15 @@ This image is the input for all further processing steps.
 
 To be able to detect lines we first need to create a binary image showing potentially relevant points.
 
-Binary SobelX Threhshold S channel
+The binary image is created by applying the sobel operator in x direction and thresholding the results with
+a configurable lower and upper limit.
 
+Additionally the RGB image is converted to HLS color space and the S color space is thresholded by an lower and
+upper limit.
 
-To improve stability and reduce the calulation time we applied two masks to the binary image.
+If one of these two binary criteria is fulfilled the pixel is considered as relevant for further processing.
+
+To improve stability we applied two masks to the binary image.
 The red mask reduces the view of view to a realistic area to search for lane line while the green mask
 takes care of irregularities within the road.
 
@@ -149,8 +153,24 @@ I verified that my perspective transform was working as expected by drawing the 
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
+To find lanes the image is split horizontally into a left and right image plane.
+Afterwards each plane is searched separately.
+The top third of the birds eye view image is ignored.
+
+Initially a histogram is taken to find the center of the points lying in the left and right plane.
+Around this center a search window is placed and all points within this window are stored.
+
+The search window is adapted in the next step by choosing the mean of the points detected within the current
+search window. This makes the search window adapt to the shape of the curve.
+
+The points detected for the left respectively right lane are fit to a polynomial of 2nd order.
+The result can be seen as yellow line in the example image.
 
 ![alt text][image5]
+
+These lanes are not detected from the image showed in the remaining documentation.
+We chose a different image that has a smaller radius to show that the algorithm does not only process
+straight lines.
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
@@ -160,11 +180,12 @@ the minimum lane width is 3.7m.
 With this information we were able to determine the width of a pixel in meters. We took the left and right
 position of the lanes in the bottom of the image in pixels and said this width is equivalent to 4 meters.
 
-
-
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+All these steps are combined in the `find_lanes()` method. It takes the current image and allows some settings that
+are made automatically if you use the `main.py` file with the config file.
+
+It returns an annotated image as shown below.
 
 ![alt text][image6]
 
@@ -190,11 +211,20 @@ Additional it keeps track of the detected lanes to improve stability.
 
 ####1. Averaging over multiple frames
 
-![alt text][video2]
+Contrary to the algorithm for a single image the video lane tracking algorithm low passes the results
+of the current estimation.
+This improves the stability of the findings as the lanes will only change continuously (while driving in the
+same lane).
 
 ####2. Adapt search window
 
-![alt text][video3]
+After a first of the curves is found the search window could be chosen more elegantly then using the brute force
+method described above.
+
+Knowing the radius of the last curvature measurement and assuming a continuous change in the curvature
+you can place a search window around this curve.
+
+![alt text][video2]
 
 ####3. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
@@ -208,10 +238,21 @@ Here's a [link to my video result](./results/project_video.mp4)
 
 During the implementation I faced, among others, these issues and possible improvements I want to discuss:
 - The algorithm is very sensitive to lighting conditions. Playing around with the thresholds works locally
-but in general there will always be some situation.
+but in general there will always be some situation the algorithm may fail. An adaptive algorithm (like Otsu) could
+be used to improve the algorithm. Alternatively it would be possible to adapt the settings iteratively
+based on the current fit quality and consistency of the lanes.
 - Detection gets worse the further the lane is in front of the car. This problem could maybe be solved
 by weighting the influence of the detected points on the "fit" based on the distance to the car. I want
 to try this later on.
 - Currently left and right lane are considered independently but they will/should have very equal curvature.
-- LowPass filtering the lanes smoothed the results but makes the system slower in recovering from possible
-wrong detections. To improve this the algorithm should
+This could be used to improve the stability.
+- Adapt the mask: The mask used after binary image is currently fixed. It could be adapted with the latest
+curvature findings to improve detection on curvy roads.
+- If the vehicle changes the lane the algorithm will take a lot of time to adapt. To prevent these an appropriate
+reset mechanism has to be implemented.
+- Low pass filtering the lanes smoothed the results but makes the system slower in recovering from possible
+wrong detections. This could also benefit from a reset mechanism.
+- Further the low pass filtering of all coefficients is not entirely correct as it might alter the shape of the curve
+of the curve. I experimented with storing the found points for several frames and fitting the lane of this
+measurement. This improved stability but tremendously increased the calculating time that's why I did not
+proceed with this approach (for now).
