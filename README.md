@@ -15,11 +15,13 @@ The goals / steps of this project are the following:
 
 [image1]: ./results/cam_calibration.png "Undistorted"
 [image2]: ./results/img_process_step1.jpg "Road Transformed"
-[image3]: ./results/img_process_step2.jpg "Binary Example"
+[image3]: ./results/img_process_step2.png "Binary Example"
 [image4]: ./results/img_process_step3.png "Warp Example"
-[image5]: ./results/img_process_step4.jpg "Fit Visual"
+[image5]: ./results/img_process_step4.png "Fit Visual"
 [image6]: ./results/img_process_step5.jpg "Output"
 [video1]: ./results/project_video.mp4 "Video"
+[video2]: ./results/video_step_1.png "Video Low Pass Filter"
+[video3]: ./results/video_step_2.png "Video Search Window Adaption"
 
 ###Code Structure
 
@@ -57,7 +59,7 @@ It takes the config dictionary read from the yaml section `CameraCalibration` wh
 | ChessboardDimension       | Tuple     | Possible chessboard dimension to look for |
 | StoreIntermediateResults  | Boolean   | Store intermediate results for debugging |
 
-Default settings can be seen in `config.yaml`.
+Default settings can be found in `config.yaml`.
 
 The `run_camera_calibration` method assumes that the chessboard is fixed at the (x,y) plane
 with z=0 and that the same chessboard is used in all images.
@@ -75,7 +77,7 @@ The results of distortion correction can be seen here:
 
 ###Pipeline (single images)
 
-Images from a selected folder can be processed using the `process_image_folder` method with the `ALF`
+Images from a selected folder can be processed using the `process_image_folder()` method within the `ALF`
 class.
 
 It takes the config dictionary read from the yaml section `Image` which allows these settings:
@@ -88,21 +90,39 @@ It takes the config dictionary read from the yaml section `Image` which allows t
 | StoreIntermediateResults  | Boolean   | Store intermediate results for debugging |
 | StorageFolder             | String    | Folder to store results |
 
-Default settings can be seen in `config.yaml`.
+Default settings can be found in `config.yaml`.
 
 ####1. Provide an example of a distortion-corrected image.
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
+
+For distortion correction the `ALF` class internally stores the calculated or loaded calibration and
+distortion matrix.
+Applying `cv2.undistort()` to the input matrix gives the undistorted image:
 
 ![alt text][image2]
 
+This image is the input for all further processing steps.
+
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+
+To be able to detect lines we first need to create a binary image showing potentially relevant points.
+
+Binary SobelX Threhshold S channel
+
+
+To improve stability and reduce the calulation time we applied two masks to the binary image.
+The red mask reduces the view of view to a realistic area to search for lane line while the green mask
+takes care of irregularities within the road.
 
 ![alt text][image3]
 
 ####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+The perspective transform is implemented in the `transform_to_bev(image, src, offset=(0, 0))` method in the
+`Utils.py` file.
+It takes the image, the source points and an horizontal and vertical offset of the parallel points in the
+transformed image.
+The source points where chosen to be a fixed position on the image while the destination points are
+adapted to the image size.
 
 ```
 src = np.float32([[190, 720], [583, 460], [705, 460], [1150, 720]])
@@ -114,7 +134,7 @@ dst = np.float32([
     ])
 
 ```
-This resulted in the following source and destination points:
+This resulted in the following source and destination points for the given image size:
 
 | Source        | Destination   |
 |:-------------:|:-------------:|
@@ -129,13 +149,18 @@ I verified that my perspective transform was working as expected by drawing the 
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
 
 ![alt text][image5]
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+To determine the position of the car we assumed the lane width to be 4 meters. According to US laws
+the minimum lane width is 3.7m.
+
+With this information we were able to determine the width of a pixel in meters. We took the left and right
+position of the lanes in the bottom of the image in pixels and said this width is equivalent to 4 meters.
+
+
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
@@ -147,7 +172,7 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 ###Pipeline (video)
 
-To process a video you can use the `process_video` method with the `ALF` class.
+To process a video you can use the `process_video()` method within the `ALF` class.
 
 It takes the config dictionary read from the yaml section `Video` which allows these settings:
 
@@ -158,18 +183,18 @@ It takes the config dictionary read from the yaml section `Video` which allows t
 | StorageFolder             | String          | Folder to store results |
 | TrackLanes                | Boolean         | Track lanes between successive frames |
 
-Default settings can be seen in `config.yaml`.
+Default settings can be found in `config.yaml`.
 
 To detect lanes it uses the same methods as described above for single (independent) images.
 Additional it keeps track of the detected lanes to improve stability.
 
 ####1. Averaging over multiple frames
 
-
+![alt text][video2]
 
 ####2. Adapt search window
 
-
+![alt text][video3]
 
 ####3. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
@@ -181,3 +206,12 @@ Here's a [link to my video result](./results/project_video.mp4)
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
+During the implementation I faced, among others, these issues and possible improvements I want to discuss:
+- The algorithm is very sensitive to lighting conditions. Playing around with the thresholds works locally
+but in general there will always be some situation.
+- Detection gets worse the further the lane is in front of the car. This problem could maybe be solved
+by weighting the influence of the detected points on the "fit" based on the distance to the car. I want
+to try this later on.
+- Currently left and right lane are considered independently but they will/should have very equal curvature.
+- LowPass filtering the lanes smoothed the results but makes the system slower in recovering from possible
+wrong detections. To improve this the algorithm should
