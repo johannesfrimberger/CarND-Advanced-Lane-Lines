@@ -235,7 +235,7 @@ class AdvancedLaneFinding:
 
         else:
             # Take a histogram of the bottom half of the image
-            histogram = np.sum(image[image.shape[0] / 2:, :], axis=0)
+            histogram = np.sum(image[image.shape[0] / 3:, :], axis=0)
 
             # Find the peak of the left and right halves of the histogram
             # These will be the starting point for the left and right lines
